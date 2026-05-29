@@ -14,6 +14,7 @@ const initialState = {
   showCommands: false,
   darkMode: false,
   figureColors: {},
+  figureSeeds: {},
   streamText: '',
   error: null,
 };
@@ -21,23 +22,10 @@ const initialState = {
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_TOPIC':
-      return {
-        ...state,
-        topic: action.topic,
-        messages: [],
-        history: [],
-        figureColors: {},
-        error: null,
-      };
+      return { ...state, topic: action.topic, messages: [], history: [], figureColors: {}, figureSeeds: {}, error: null };
 
     case 'START_STREAM':
-      return {
-        ...state,
-        isStreaming: true,
-        showCommands: false,
-        error: null,
-        streamText: '',
-      };
+      return { ...state, isStreaming: true, showCommands: false, error: null, streamText: '' };
 
     case 'APPEND_STREAM':
       return { ...state, streamText: state.streamText + action.text };
@@ -53,9 +41,15 @@ function reducer(state, action) {
       }
 
       const figureColors = { ...state.figureColors };
+      const figureSeeds = { ...state.figureSeeds };
       for (const msg of parsed) {
-        if (msg.type === 'figure' && figureColors[msg.name] === undefined) {
-          figureColors[msg.name] = assignFigureColor(msg.name, figureColors);
+        if (msg.type === 'figure') {
+          if (figureColors[msg.name] === undefined) {
+            figureColors[msg.name] = assignFigureColor(msg.name, figureColors);
+          }
+          if (figureSeeds[msg.name] === undefined) {
+            figureSeeds[msg.name] = msg.name + Object.keys(figureSeeds).length;
+          }
         }
       }
 
@@ -67,6 +61,7 @@ function reducer(state, action) {
         showCommands,
         streamText: '',
         figureColors,
+        figureSeeds,
       };
     }
 
@@ -108,20 +103,17 @@ export default function App() {
     }
   }
 
-  // Dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('dark', state.darkMode);
     localStorage.setItem('roundtable_dark_mode', state.darkMode);
   }, [state.darkMode]);
 
-  // Auto scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [state.messages, state.streamText]);
 
   const sendMessage = useCallback(async (topic, command) => {
     const current = stateRef.current;
-
     let reqHistory;
     if (command) {
       const cmdContent = command.startsWith('引入新人物：') ? command : command;
@@ -180,105 +172,98 @@ export default function App() {
         onSettings={() => setShowSettings(!showSettings)}
       />
 
-      <div className="chat-scroll" style={{ flex: 1 }}>
-        {/* Settings panel */}
-        {showSettings && (
-          <div style={{
-            padding: '20px 16px',
-            background: 'var(--bg-input)',
-            borderBottom: '1px solid var(--border-subtle)',
-            marginBottom: '8px',
-          }}>
-            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
-              ⚙️ DeepSeek API Key
-            </div>
-            <input
-              type="password"
-              value={keyInput}
-              onChange={e => setKeyInput(e.target.value)}
-              placeholder="sk-..."
-              style={{
-                width: '100%', height: '40px', padding: '0 12px',
-                borderRadius: '10px', border: '1.5px solid var(--border-subtle)',
-                fontSize: '0.875rem', fontFamily: 'monospace',
-                background: 'var(--bg-chat)', color: 'var(--text-primary)',
-                marginBottom: '8px',
-              }}
-            />
-            <button
-              onClick={handleSaveKey}
-              style={{
-                height: '36px', padding: '0 20px', borderRadius: '10px',
-                border: 'none', background: '#2D2A26', color: '#fff',
-                fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer',
-              }}
-            >保存</button>
+      {/* Settings */}
+      {showSettings && (
+        <div style={{
+          padding: '16px', background: 'var(--bg-input)',
+          borderBottom: '1px solid var(--border-subtle)',
+        }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>
+            ⚙️ DeepSeek API Key
+          </div>
+          <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)}
+            placeholder="sk-..."
+            style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: '10px',
+              border: '1.5px solid var(--border-subtle)', fontSize: '0.875rem', fontFamily: 'monospace',
+              background: 'var(--bg-chat)', color: 'var(--text-primary)', marginBottom: '8px' }} />
+          <button onClick={handleSaveKey}
+            style={{ height: '36px', padding: '0 20px', borderRadius: '10px', border: 'none',
+              background: '#2D2A26', color: '#fff', fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer' }}>
+            保存
+          </button>
+        </div>
+      )}
+
+      {/* Chat scroll area */}
+      <div style={{
+        flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        paddingBottom: state.showCommands && !state.isStreaming ? '140px' : '70px',
+      }}>
+        {/* Empty state with key prompt */}
+        {!hasContent && !hasApiKey && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🔑</div>
+            <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>首次使用，设置 API Key</div>
+            <div style={{ fontSize: '0.85rem', marginBottom: '16px' }}>点击左上角 ⚙️ 输入 DeepSeek Key<br />只需设置一次</div>
+            <button onClick={() => setShowSettings(true)}
+              style={{ padding: '10px 24px', borderRadius: '12px', border: 'none', background: '#2D2A26', color: '#fff', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer' }}>
+              ⚙️ 设置
+            </button>
           </div>
         )}
 
         {!hasContent && hasApiKey && (
-          <div className="empty-state">
-            <div className="empty-state__icon">🏛️</div>
-            <div className="empty-state__title">开启一场思想对话</div>
-            <div className="empty-state__desc">
-              输入任何议题，AI 将邀请<br />
-              多位历史人物展开圆桌辩论
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🏛️</div>
+            <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>开启一场思想对话</div>
+            <div style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>输入议题，AI 将邀请多位人物<br />展开一场深度的圆桌辩论</div>
           </div>
         )}
 
-        {!hasContent && !hasApiKey && (
-          <div className="empty-state">
-            <div className="empty-state__icon">🔑</div>
-            <div className="empty-state__title">首次使用，请设置 API Key</div>
-            <div className="empty-state__desc" style={{ marginBottom: '16px' }}>
-              点击右上角 ⚙️ 设置你的 DeepSeek API Key<br />
-              只需设置一次，保存在浏览器中
-            </div>
-            <button onClick={() => setShowSettings(true)}
-              style={{
-                padding: '12px 28px', borderRadius: '12px', border: 'none',
-                background: '#2D2A26', color: '#fff', fontSize: '0.95rem',
-                fontWeight: 600, cursor: 'pointer',
-              }}
-            >⚙️ 设置 API Key</button>
-          </div>
-        )}
-
+        {/* Parsed messages */}
         {state.messages.map((msg, i) => (
           <ChatBubble
             key={i}
             message={msg}
             colorIndex={msg.type === 'figure' ? (state.figureColors[msg.name] || 0) : 0}
+            seed={msg.type === 'figure' ? (state.figureSeeds[msg.name] || msg.name) : undefined}
             darkMode={state.darkMode}
+            style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}
           />
         ))}
 
+        {/* Streaming indicator */}
+        {state.isStreaming && !state.streamText && <LoadingDots />}
         {state.isStreaming && state.streamText && (
-          <div className="figure-bubble" style={{ opacity: 1 }}>
-            <div className="figure-bubble__content"
-              style={{
-                backgroundColor: state.darkMode ? '#1f2937' : '#F3F4F6',
-                color: state.darkMode ? '#D1D5DB' : '#4B5563',
-                maxWidth: '92%',
-                fontSize: '0.9375rem',
-                lineHeight: 1.65,
-                padding: '10px 14px',
-                borderRadius: '16px',
-              }}
-            >
-              {state.streamText}
+          <div style={{
+            padding: '10px 14px', display: 'flex', gap: '10px', alignItems: 'flex-start',
+            animation: 'fadeUp 0.3s ease forwards',
+          }}>
+            <div style={{
+              width: '42px', height: '42px', borderRadius: '50%',
+              background: state.darkMode ? '#374151' : '#E5E7EB',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '0.8rem',
+            }}>...</div>
+            <div style={{
+              background: state.darkMode ? '#1f2937' : '#FFFFFF',
+              borderRadius: '4px 16px 16px 16px',
+              padding: '10px 14px', fontSize: '0.9375rem',
+              lineHeight: '1.6', color: state.darkMode ? '#E5E7EB' : '#1F2937',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flex: 1,
+            }}>
+              {state.streamText.slice(-300)}
             </div>
           </div>
         )}
 
-        {state.isStreaming && !state.streamText && <LoadingDots />}
-
+        {/* Error */}
         {state.error && (
-          <div className="moderator-bubble">
-            <div className="moderator-bubble__content" style={{ color: '#DC2626' }}>
-              ⚠️ {state.error}
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '16px' }}>
+            <span style={{
+              background: '#FEE2E2', color: '#991B1B', fontSize: '0.8rem',
+              padding: '8px 14px', borderRadius: '10px',
+            }}>⚠️ {state.error}</span>
           </div>
         )}
 

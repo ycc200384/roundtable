@@ -1,7 +1,7 @@
 /**
  * 圆桌会 API 服务
  * 直接调用 DeepSeek API（Anthropic 兼容接口）
- * SSE 流式消费 + 响应解析
+ * SSE 流式消费 + 响应解析 + 头像生成
  */
 
 const DEEPSEEK_URL = "https://api.deepseek.com/anthropic/v1/messages";
@@ -26,15 +26,9 @@ const SYSTEM_PROMPT = `你是一位极具洞察力的圆桌讨论主持人。目
 - ASCII图用盒形字符`;
 
 function getApiKey() {
-  // 从 localStorage 读取，如果没有则提示用户输入
   const key = localStorage.getItem('deepseek_api_key');
   if (!key) {
-    const input = prompt('请输入你的 DeepSeek API Key：\n（只需输入一次，会保存在浏览器中）');
-    if (input) {
-      localStorage.setItem('deepseek_api_key', input.trim());
-      return input.trim();
-    }
-    throw new Error('未设置 API Key');
+    throw new Error('未设置 API Key。请点击左上角 ⚙️ 设置。');
   }
   return key;
 }
@@ -45,6 +39,14 @@ export function setApiKey(key) {
 
 export function getStoredApiKey() {
   return localStorage.getItem('deepseek_api_key') || '';
+}
+
+/**
+ * Get avatar URL for a figure name using DiceBear (free, cute anime style)
+ */
+export function getAvatarUrl(name, seed) {
+  // Use lorelei style - cute, anime-like, distinct per seed
+  return `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(seed || name)}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf,b5e8d5`;
 }
 
 const FIGURE_PALETTE = [

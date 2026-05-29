@@ -2,7 +2,7 @@ import FigureBubble from './FigureBubble';
 import ModeratorBubble from './ModeratorBubble';
 import AsciiDiagram from './AsciiDiagram';
 
-export default function ChatBubble({ message, colorIndex, darkMode, style }) {
+export default function ChatBubble({ message, colorIndex, seed, darkMode, style }) {
   switch (message.type) {
     case 'figure':
       return (
@@ -11,6 +11,7 @@ export default function ChatBubble({ message, colorIndex, darkMode, style }) {
           action={message.action}
           content={message.content}
           colorIndex={colorIndex}
+          seed={seed}
           darkMode={darkMode}
           style={style}
         />
