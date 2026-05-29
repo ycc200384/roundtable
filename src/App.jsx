@@ -224,19 +224,6 @@ export default function App() {
           <span style={{ display: 'inline-block', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bubble-moderator-bg)', padding: '4px 14px', borderRadius: '12px' }}>{state.topic}</span>
         </div>}
 
-        {/* New conversation button */}
-        {state.topic && !state.isStreaming && (
-          <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
-            <button onClick={handleNewSession} style={{
-              padding: '6px 16px', borderRadius: '14px', border: '1.5px dashed var(--border-subtle)',
-              background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem',
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}>
-              ✨ 开启新话题
-            </button>
-          </div>
-        )}
-
         {!hasContent && hasApiKey && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: 40, textAlign: 'center' }}>
             <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🏛️</div>
