@@ -104,37 +104,68 @@ Error generating stack: `+e.message+`
           from { transform: translateX(-100%); }
           to { transform: translateX(0); }
         }
-      `})]}):null}function oe(e){let t=new Date(e),n=new Date-t;return n<36e5?`${Math.floor(n/6e4)}分钟前`:n<864e5?`${Math.floor(n/36e5)}小时前`:`${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,`0`)}`}var se=`https://api.deepseek.com/anthropic/v1/messages`,ce=`deepseek-v4-pro[1m]`,le=`你是李继刚"圆桌讨论"技能驱动的对话引擎。严格按以下框架运行，但输出为自然群聊格式。
+      `})]}):null}function oe(e){let t=new Date(e),n=new Date-t;return n<36e5?`${Math.floor(n/6e4)}分钟前`:n<864e5?`${Math.floor(n/36e5)}小时前`:`${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,`0`)}`}var se=`https://api.deepseek.com/anthropic/v1/messages`,ce=`deepseek-v4-pro[1m]`,le=`你是李继刚"圆桌讨论"框架的执行者。严格按以下流程运行，输出为微信风格群聊。
 
-## 核心框架（不可偏离）
+## 核心原则
+求真为目标，建设性对话。主持人是理性之锚，冷静客观，拥有极强洞察力，引导思想交锋走向更深层次。
 
-### 1. 选人
-根据议题选3-5位**真实历史/当代人物**。必须：真实人物（如尼采、王阳明、鲁迅、波伏娃），立场形成张力网络，至少一位意外视角。
+## 执行流程（严格遵循）
 
-主持人用自然语言介绍参会者：
-主持人：今天讨论「{议题}」。我邀请了 [列出3-5人，每人一句话简介+立场]
+### 第一步：选人
+**每次新议题必须重新选人！** 根据具体议题挑选不同的真实人物，绝不能用一套固定人物。
 
-### 2. 开场
-主持人提出定义性问题，然后各位依次发言。
+根据当前议题选3-5位**真实历史/当代人物**。选人原则：
+- 人物必须与该议题**直接相关**（在该领域有经典著作或知名言论）
+- 立场形成张力网络（不是简单正反方）
+- 至少包含一位"意外视角"——来自议题本身领域之外
+- 绝对不许编造人物名
+- **每换一个新议题，人物必须完全不同**
 
-### 3. 辩论循环
-- 发言必须回应前面的人，引用其经典观点
-- 主持人在适当时候做简短综述，提炼核心争议点
-- 主持人偶尔提出深层引导问题
-- 像真人群聊：有锋芒、可质疑、可赞同
+举例：
+- 讨论AI创造力 → 可选图灵、侯世达、杜威、阿达·洛夫莱斯
+- 讨论自由意志 → 可选叔本华、丹尼特、斯宾诺莎、李时珍
+- 讨论爱情本质 → 可选柏拉图、弗洛姆、波伏娃、苏轼
 
-### 4. 用户互动
-用户可能：继续讨论/质疑/换角度/要求总结/请新人物加入
-自然回应，保持对话流畅。
+主持人开场介绍：
+主持人：感谢各位。今天的核心议题是「{议题}」。为穷尽其理，我邀请了以下几位人物：[列出姓名、简要身份、核心立场]。在深入探讨之前，我想先请问各位：我们应当如何定义「{核心概念}」？它的核心要素是什么？
+
+### 第二步：各位依次发言
+每人发言必须：
+- 忠于其真实思想体系，引用或化用其经典著作/知名观点
+- 发言3-5句话，有锋芒
+- 每次发言结尾一句话总结（以"简言之："开头）
+
+### 第三步：辩论循环（核心）
+每轮流程：
+1. **动态发言**：不是每人固定说一次。根据讨论动态决定谁发言。每人必须回应前面发言（质疑/补充/反驳），不许自说自话。
+2. **主持人综述**：提炼本轮核心争议点（最深的裂缝），提出下一层引导问题（从争议中生长出来的更深问题）。
+3. **指令提示**：主持人最后说：主持人：(可继续 / 止结束 / 深入此节 / 引入新人物)
+
+指令含义：
+- 可：接受下一层问题，继续推进
+- 止：结束讨论，进入总结
+- 深入此节：不推进新问题，继续围绕当前争议深挖
+- 引入新人物：用户指定一位新人物加入
+
+### 第四步：结束总结
+收到"止"指令后，主持人做三件事：
+1. 全局总结
+2. 知识网络整理（核心概念、立场、争议点及其关系）
+3. 列出未解决的开放问题
 
 ## 输出格式（铁律）
-名字：发言内容
-
-主持人发言：
+主持人发言格式：
 主持人：发言内容
 
-每段发言3-5句话，像真人聊天。不要用【】符号，不要行动标签。
-不要编造人物名。必须使用真实历史/当代人物。`;function ue(){let e=localStorage.getItem(`deepseek_api_key`);if(!e)throw Error(`未设置 API Key`);return e}function T(e){localStorage.setItem(`deepseek_api_key`,e.trim())}function E(){return localStorage.getItem(`deepseek_api_key`)||``}async function*de(e){let t=ue(),n=await fetch(se,{method:`POST`,headers:{"x-api-key":t,"anthropic-version":`2023-06-01`,"content-type":`application/json`},body:JSON.stringify({model:ce,system:le,messages:e,max_tokens:8192,stream:!0})});if(!n.ok)throw await n.text(),Error(`API ${n.status}`);let r=n.body.getReader(),i=new TextDecoder,a=``;for(;;){let{done:e,value:t}=await r.read();if(e)break;a+=i.decode(t,{stream:!0});let n=a.split(`
+人物发言格式：
+人物姓名：发言内容
+
+注意：
+- 不要使用【】符号
+- 不要使用行动标签
+- 每段发言3-5句话，像真人群聊
+- 人物必须是真实历史/当代人物
+- 发言要引用其真实思想体系`;function ue(){let e=localStorage.getItem(`deepseek_api_key`);if(!e)throw Error(`未设置 API Key`);return e}function T(e){localStorage.setItem(`deepseek_api_key`,e.trim())}function E(){return localStorage.getItem(`deepseek_api_key`)||``}async function*de(e){let t=ue(),n=await fetch(se,{method:`POST`,headers:{"x-api-key":t,"anthropic-version":`2023-06-01`,"content-type":`application/json`},body:JSON.stringify({model:ce,system:le,messages:e,max_tokens:8192,stream:!0})});if(!n.ok)throw await n.text(),Error(`API ${n.status}`);let r=n.body.getReader(),i=new TextDecoder,a=``;for(;;){let{done:e,value:t}=await r.read();if(e)break;a+=i.decode(t,{stream:!0});let n=a.split(`
 `);a=n.pop()||``;for(let e of n)if(e.startsWith(`data: `))try{let t=JSON.parse(e.slice(6));if(t.type===`content_block_delta`){let e=t.delta?.text;e&&(yield{text:e})}else t.type===`message_stop`&&(yield{done:!0})}catch{}}}function fe(e){let t=[],n=e.split(`
 `),r=null;for(let e of n){let n=e.match(/^(.{1,10})[：:]\s*(.+)/);n&&!e.startsWith(`http`)?(r&&r.content.trim()&&t.push(r),r={type:`speech`,name:n[1].trim(),content:n[2]}):r&&(r.content+=`
 `+e)}r&&r.content.trim()&&t.push({...r,isComplete:!0}),t.length>0&&(t[t.length-1]={...t[t.length-1],isComplete:!0});let i=n[n.length-1]||``,a=i.match(/^(.{1,10})[：:]\s*(.+)/),o=null;return a&&!i.startsWith(`http`)&&(o={type:`speech`,name:a[1].trim(),content:a[2],isStreaming:!0}),{messages:t,streamingMsg:o}}var pe={conversationId:null,topic:``,allMessages:[],history:[],isStreaming:!1,darkMode:!1,streamingMsg:null,error:null,loaded:!1};function me(e,t){switch(t.type){case`INIT_DONE`:return{...e,loaded:!0};case`LOAD_CONV`:return{...e,conversationId:t.data.id,topic:t.data.topic||``,allMessages:t.data.allMessages||[],history:t.data.history||[],error:null,loaded:!0};case`SET_CONV_ID`:return{...e,conversationId:t.id};case`SET_TOPIC`:return{...e,topic:t.topic};case`ADD_USER_MSG`:return{...e,allMessages:[...e.allMessages,{type:`user`,content:t.content}]};case`START_STREAM`:return{...e,isStreaming:!0,error:null,streamingMsg:null};case`UPDATE_STREAM`:{let{messages:n,streamingMsg:r}=fe(t.fullText);return{...e,streamingMsg:r,aiMessages:n}}case`FINISH_STREAM`:{let n=t.parsed||[],r=[...e.history];return t.content?.trim()&&r.push({role:`assistant`,content:t.content.trim()}),{...e,allMessages:[...e.allMessages,...n],history:r,isStreaming:!1,streamingMsg:null,aiMessages:[]}}case`SET_ERROR`:return{...e,isStreaming:!1,error:t.error,streamingMsg:null};case`TOGGLE_DARK`:return{...e,darkMode:!e.darkMode};case`NEW_SESSION`:return{...e,conversationId:null,topic:``,allMessages:[],history:[],error:null,streamingMsg:null,aiMessages:[]};default:return e}}function D(){let[e,t]=(0,l.useReducer)(me,pe,e=>{let t=localStorage.getItem(`roundtable_dark_mode`);return{...e,darkMode:t===`true`||window.matchMedia(`(prefers-color-scheme: dark)`).matches}}),n=(0,l.useRef)(null),r=(0,l.useRef)(e);r.current=e;let i=(0,l.useRef)(``),a=(0,l.useRef)(null),[o,s]=(0,l.useState)(!0),[c,u]=(0,l.useState)(!1),[d,m]=(0,l.useState)(E()),[h,g]=(0,l.useState)(!!E()),[_,v]=(0,l.useState)(!1);function y(){let e=d.trim();e&&(T(e),g(!0),u(!1))}(0,l.useEffect)(()=>{(async()=>{try{let e=await w();e.length>0&&(t({type:`LOAD_CONV`,data:e[0]}),a.current=e[0].id)}catch{}t({type:`INIT_DONE`})})()},[]),(0,l.useEffect)(()=>{function e(){let e=r.current;if(e.allMessages.length>0&&e.topic){let t={id:a.current||e.conversationId,topic:e.topic,allMessages:e.allMessages,history:e.history};try{let e=indexedDB.open(`roundtable_db`,1);e.onsuccess=e=>{let n=e.target.result.transaction(`conversations`,`readwrite`).objectStore(`conversations`),r={...t,updatedAt:Date.now()};r.id||(r.createdAt=Date.now()),n.put(r)}}catch{}}}return window.addEventListener(`beforeunload`,e),()=>window.removeEventListener(`beforeunload`,e)},[]),(0,l.useEffect)(()=>{document.documentElement.classList.toggle(`dark`,e.darkMode),localStorage.setItem(`roundtable_dark_mode`,e.darkMode)},[e.darkMode]),(0,l.useEffect)(()=>{o&&n.current?.scrollIntoView({behavior:`smooth`})},[e.allMessages,e.streamingMsg]);function S(e){let t=e.target;s(t.scrollHeight-t.scrollTop-t.clientHeight<80)}let C=(0,l.useRef)(0);(0,l.useEffect)(()=>{let n=e.allMessages;n.length>C.current&&n.length>0&&e.topic&&!e.isStreaming&&(C.current=n.length,re({id:a.current||e.conversationId||void 0,topic:e.topic,allMessages:n,history:e.history}).then(e=>{e.id&&!a.current&&(a.current=e.id,t({type:`SET_CONV_ID`,id:e.id}))}).catch(()=>{}))},[e.allMessages,e.isStreaming]);let te=(0,l.useCallback)(async e=>{let n=r.current,a=n.history.length===0,o=a?e:n.topic||e;a&&t({type:`SET_TOPIC`,topic:o}),t({type:`ADD_USER_MSG`,content:e});let s=[...n.history,{role:`user`,content:e}];t({type:`START_STREAM`}),i.current=``;try{for await(let e of de(s))e.text&&(i.current+=e.text,t({type:`UPDATE_STREAM`,fullText:i.current}));t({type:`FINISH_STREAM`,parsed:fe(i.current).messages,content:i.current})}catch(e){t({type:`SET_ERROR`,error:e.message||`连接失败`})}},[]);function ne(){t({type:`NEW_SESSION`}),a.current=null,i.current=``,C.current=0}function ie(e){t({type:`LOAD_CONV`,data:e}),a.current=e.id,C.current=(e.allMessages||e.messages||[]).length,v(!1)}let oe=e.allMessages.length>0||e.isStreaming;return e.loaded?(0,f.jsxs)(`div`,{style:{height:`100dvh`,display:`flex`,flexDirection:`column`,background:`var(--bg-primary)`},children:[(0,f.jsx)(ae,{open:_,onClose:()=>v(!1),onSelect:ie,currentId:a.current||e.conversationId}),(0,f.jsx)(p,{darkMode:e.darkMode,onToggleDark:()=>t({type:`TOGGLE_DARK`}),onReset:ne,onSettings:()=>u(!c),onHistory:()=>v(!0),hasHistory:!0}),c&&(0,f.jsxs)(`div`,{style:{padding:`14px 16px`,background:`var(--bg-input)`,borderBottom:`1px solid var(--border-subtle)`},children:[(0,f.jsx)(`div`,{style:{fontSize:`0.8rem`,fontWeight:600,marginBottom:`6px`,color:`var(--text-primary)`},children:`DeepSeek API Key`}),(0,f.jsxs)(`div`,{style:{display:`flex`,gap:`8px`},children:[(0,f.jsx)(`input`,{type:`password`,value:d,onChange:e=>m(e.target.value),placeholder:`sk-...`,style:{flex:1,height:`38px`,padding:`0 12px`,borderRadius:`10px`,border:`1.5px solid var(--border-subtle)`,fontSize:`0.85rem`,fontFamily:`monospace`,background:`var(--bg-chat)`,color:`var(--text-primary)`}}),(0,f.jsx)(`button`,{onClick:y,style:{padding:`0 18px`,borderRadius:`10px`,border:`none`,background:`#2D2A26`,color:`#fff`,fontSize:`0.85rem`,fontWeight:500,cursor:`pointer`},children:`保存`})]})]}),(0,f.jsxs)(`div`,{style:{flex:1,overflowY:`auto`,WebkitOverflowScrolling:`touch`,paddingBottom:`8px`},onScroll:S,children:[e.topic&&(0,f.jsx)(`div`,{style:{textAlign:`center`,padding:`12px 24px 8px`},children:(0,f.jsx)(`span`,{style:{display:`inline-block`,fontSize:`0.75rem`,color:`var(--text-muted)`,background:`var(--bubble-moderator-bg)`,padding:`4px 14px`,borderRadius:`12px`},children:e.topic})}),e.topic&&!e.isStreaming&&(0,f.jsx)(`div`,{style:{textAlign:`center`,padding:`4px 0 8px`},children:(0,f.jsx)(`button`,{onClick:ne,style:{padding:`6px 16px`,borderRadius:`14px`,border:`1.5px dashed var(--border-subtle)`,background:`transparent`,color:`var(--text-muted)`,fontSize:`0.75rem`,cursor:`pointer`,fontFamily:`inherit`},children:`✨ 开启新话题`})}),!oe&&h&&(0,f.jsxs)(`div`,{style:{display:`flex`,flexDirection:`column`,alignItems:`center`,justifyContent:`center`,height:`60%`,padding:40,textAlign:`center`},children:[(0,f.jsx)(`div`,{style:{fontSize:`3.5rem`,marginBottom:12},children:`🏛️`}),(0,f.jsx)(`div`,{style:{fontFamily:`'Noto Serif SC', serif`,fontSize:`1.15rem`,fontWeight:700,color:`var(--text-secondary)`,marginBottom:6},children:`圆桌会`}),(0,f.jsx)(`div`,{style:{fontSize:`0.85rem`,color:`var(--text-muted)`,lineHeight:1.5},children:`输入议题，开启一场思想对话`})]}),!oe&&!h&&(0,f.jsxs)(`div`,{style:{display:`flex`,flexDirection:`column`,alignItems:`center`,justifyContent:`center`,height:`60%`,padding:40,textAlign:`center`},children:[(0,f.jsx)(`div`,{style:{fontSize:`3.5rem`,marginBottom:12},children:`🏛️`}),(0,f.jsx)(`div`,{style:{fontFamily:`'Noto Serif SC', serif`,fontSize:`1.15rem`,fontWeight:700,color:`var(--text-secondary)`,marginBottom:6},children:`圆桌会`}),(0,f.jsx)(`div`,{style:{fontSize:`0.85rem`,color:`var(--text-muted)`,marginBottom:20,lineHeight:1.5},children:`与思想者对话`}),(0,f.jsx)(`button`,{onClick:()=>u(!0),style:{padding:`10px 24px`,borderRadius:`20px`,border:`1.5px solid var(--border-subtle)`,background:`var(--bg-input)`,color:`var(--text-secondary)`,fontSize:`0.9rem`,cursor:`pointer`,fontFamily:`inherit`},children:`⚙️ 设置 API Key`})]}),e.allMessages.map((t,n)=>(0,f.jsx)(b,{message:t,darkMode:e.darkMode,style:{animationDelay:`${Math.min(n*.03,.2)}s`}},`s-${n}`)),(e.aiMessages||[]).filter(t=>!e.allMessages.some(e=>e.content===t.content&&e.name===t.name)).map((t,n)=>(0,f.jsx)(b,{message:t,darkMode:e.darkMode},`ai-${n}`)),e.streamingMsg&&(0,f.jsx)(b,{message:e.streamingMsg,darkMode:e.darkMode}),e.isStreaming&&!e.streamingMsg&&(!e.aiMessages||e.aiMessages.length===0)&&(0,f.jsx)(ee,{}),!o&&(0,f.jsx)(`div`,{style:{position:`sticky`,bottom:8,textAlign:`center`},children:(0,f.jsx)(`button`,{onClick:()=>{n.current?.scrollIntoView({behavior:`smooth`}),s(!0)},style:{padding:`6px 14px`,borderRadius:`16px`,border:`none`,background:`var(--bg-input)`,color:`var(--text-secondary)`,fontSize:`0.75rem`,cursor:`pointer`,fontFamily:`inherit`,boxShadow:`0 2px 8px rgba(0,0,0,0.12)`},children:`↓ 最新消息`})}),e.error&&(0,f.jsx)(`div`,{style:{textAlign:`center`,padding:16},children:(0,f.jsxs)(`span`,{style:{background:`#FEE2E2`,color:`#991B1B`,fontSize:`0.8rem`,padding:`8px 14px`,borderRadius:`10px`},children:[`⚠️ `,e.error]})}),(0,f.jsx)(`div`,{ref:n})]}),(0,f.jsx)(x,{onSend:te,disabled:e.isStreaming,placeholder:oe?`继续讨论...`:`输入讨论话题...`})]}):(0,f.jsx)(`div`,{style:{height:`100dvh`,display:`flex`,alignItems:`center`,justifyContent:`center`,background:`var(--bg-primary)`,color:`var(--text-muted)`},children:`加载中...`})}(0,u.createRoot)(document.getElementById(`root`)).render((0,f.jsx)(l.StrictMode,{children:(0,f.jsx)(D,{})}));
