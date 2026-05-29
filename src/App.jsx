@@ -5,68 +5,65 @@ import TopicInput from './components/TopicInput';
 import LoadingDots from './components/LoadingDots';
 import HistoryDrawer from './components/HistoryDrawer';
 import { streamChat, progressiveParse, setApiKey, getStoredApiKey } from './services/api';
-import { saveConversation } from './services/storage';
+import { saveConversation, getConversations } from './services/storage';
 
-const initialState = {
+const initState = {
   conversationId: null,
   topic: '',
-  allMessages: [],   // all parsed messages including user messages
-  aiMessages: [],    // current conversation's AI messages (for progressive parse)
-  history: [],       // raw API history [{role, content}]
+  allMessages: [],
+  history: [],
   isStreaming: false,
   darkMode: false,
-  streamingMsg: null, // current incomplete message being typed
+  streamingMsg: null,
   error: null,
+  loaded: false,
 };
 
 function reducer(state, action) {
   switch (action.type) {
-    case 'LOAD_CONVERSATION':
+    case 'INIT_DONE':
+      return { ...state, loaded: true };
+    case 'LOAD_CONV':
       return { ...state, conversationId: action.data.id, topic: action.data.topic || '',
-        allMessages: action.data.allMessages || action.data.messages || [],
-        aiMessages: [], history: action.data.history || [], error: null };
+        allMessages: action.data.allMessages || [], history: action.data.history || [], error: null, loaded: true };
+    case 'SET_CONV_ID':
+      return { ...state, conversationId: action.id };
     case 'SET_TOPIC':
       return { ...state, topic: action.topic };
-    case 'ADD_USER_MSG': {
-      const msg = { type: 'user', content: action.content };
-      return { ...state, allMessages: [...state.allMessages, msg] };
-    }
+    case 'ADD_USER_MSG':
+      return { ...state, allMessages: [...state.allMessages, { type: 'user', content: action.content }] };
     case 'START_STREAM':
-      return { ...state, isStreaming: true, error: null, aiMessages: [], streamingMsg: null };
+      return { ...state, isStreaming: true, error: null, streamingMsg: null };
     case 'UPDATE_STREAM': {
-      // Progressive parse
       const { messages, streamingMsg } = progressiveParse(action.fullText);
-      return { ...state, aiMessages: messages, streamingMsg };
+      return { ...state, streamingMsg, aiMessages: messages };
     }
     case 'FINISH_STREAM': {
       const parsed = action.parsed || [];
-      const fullText = action.content || '';
       const newHistory = [...state.history];
-      if (fullText.trim()) newHistory.push({ role: 'assistant', content: fullText.trim() });
-      return { ...state,
-        allMessages: [...state.allMessages, ...parsed],
-        history: newHistory, isStreaming: false, aiMessages: [], streamingMsg: null,
-      };
+      if (action.content?.trim()) newHistory.push({ role: 'assistant', content: action.content.trim() });
+      return { ...state, allMessages: [...state.allMessages, ...parsed],
+        history: newHistory, isStreaming: false, streamingMsg: null, aiMessages: [] };
     }
     case 'SET_ERROR':
       return { ...state, isStreaming: false, error: action.error, streamingMsg: null };
     case 'TOGGLE_DARK':
       return { ...state, darkMode: !state.darkMode };
     case 'NEW_SESSION':
-      return { ...state, conversationId: null, topic: '', allMessages: [], aiMessages: [],
-        history: [], error: null };
+      return { ...state, conversationId: null, topic: '', allMessages: [], history: [], error: null, streamingMsg: null, aiMessages: [] };
     default: return state;
   }
 }
 
 export default function App() {
-  const [state, dispatch] = useReducer(reducer, initialState, (init) => {
+  const [state, dispatch] = useReducer(reducer, initState, (init) => {
     const saved = localStorage.getItem('roundtable_dark_mode');
     return { ...init, darkMode: saved === 'true' || window.matchMedia('(prefers-color-scheme: dark)').matches };
   });
   const chatEndRef = useRef(null);
   const stateRef = useRef(state); stateRef.current = state;
   const streamTextRef = useRef('');
+  const convIdRef = useRef(null);
 
   const [showSettings, setShowSettings] = useState(false);
   const [keyInput, setKeyInput] = useState(getStoredApiKey());
@@ -77,25 +74,71 @@ export default function App() {
     const t = keyInput.trim(); if (t) { setApiKey(t); setHasApiKey(true); setShowSettings(false); }
   }
 
+  // Load last conversation on startup
+  useEffect(() => {
+    (async () => {
+      try {
+        const list = await getConversations();
+        if (list.length > 0) {
+          dispatch({ type: 'LOAD_CONV', data: list[0] });
+          convIdRef.current = list[0].id;
+        }
+      } catch {}
+      dispatch({ type: 'INIT_DONE' });
+    })();
+  }, []);
+
+  // Save on page unload
+  useEffect(() => {
+    function save() {
+      const s = stateRef.current;
+      if (s.allMessages.length > 0 && s.topic) {
+        const data = { id: convIdRef.current || s.conversationId, topic: s.topic, allMessages: s.allMessages, history: s.history };
+        // Sync save via sendBeacon-like approach - use sync XHR as fallback
+        try {
+          const req = indexedDB.open('roundtable_db', 1);
+          req.onsuccess = (e) => {
+            const db = e.target.result;
+            const tx = db.transaction('conversations', 'readwrite');
+            const store = tx.objectStore('conversations');
+            const record = { ...data, updatedAt: Date.now() };
+            if (!record.id) record.createdAt = Date.now();
+            store.put(record);
+          };
+        } catch {}
+      }
+    }
+    window.addEventListener('beforeunload', save);
+    return () => window.removeEventListener('beforeunload', save);
+  }, []);
+
+  // Dark mode
   useEffect(() => {
     document.documentElement.classList.toggle('dark', state.darkMode);
     localStorage.setItem('roundtable_dark_mode', state.darkMode);
   }, [state.darkMode]);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); },
-    [state.allMessages, state.aiMessages, state.streamingMsg]);
+  // Auto-scroll
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [state.allMessages, state.streamingMsg]);
 
-  // Auto-save
+  // Auto-save after stream finishes
+  const prevMsgLenRef = useRef(0);
   useEffect(() => {
     const msgs = state.allMessages;
-    if (msgs.length > 0 && state.topic) {
-      const timer = setTimeout(() => {
-        saveConversation({ id: state.conversationId, topic: state.topic, allMessages: msgs, history: state.history })
-          .then(s => { if (s.id !== stateRef.current.conversationId) stateRef.current = { ...stateRef.current, conversationId: s.id }; }).catch(() => {});
-      }, 1000);
-      return () => clearTimeout(timer);
+    if (msgs.length > prevMsgLenRef.current && msgs.length > 0 && state.topic && !state.isStreaming) {
+      prevMsgLenRef.current = msgs.length;
+      const id = convIdRef.current || state.conversationId || undefined;
+      saveConversation({ id, topic: state.topic, allMessages: msgs, history: state.history })
+        .then(saved => {
+          if (saved.id && !convIdRef.current) {
+            convIdRef.current = saved.id;
+            dispatch({ type: 'SET_CONV_ID', id: saved.id });
+          }
+        }).catch(() => {});
     }
-  }, [state.allMessages]);
+  }, [state.allMessages, state.isStreaming]);
 
   const sendMessage = useCallback(async (userText) => {
     const cur = stateRef.current;
@@ -103,7 +146,6 @@ export default function App() {
     const topic = isFirst ? userText : (cur.topic || userText);
     if (isFirst) dispatch({ type: 'SET_TOPIC', topic });
 
-    // Show user message immediately
     dispatch({ type: 'ADD_USER_MSG', content: userText });
     const newHistory = [...cur.history, { role: 'user', content: userText }];
 
@@ -117,7 +159,6 @@ export default function App() {
           dispatch({ type: 'UPDATE_STREAM', fullText: streamTextRef.current });
         }
       }
-      // All done - final parse
       const final = progressiveParse(streamTextRef.current);
       dispatch({ type: 'FINISH_STREAM', parsed: final.messages, content: streamTextRef.current });
     } catch (err) {
@@ -127,30 +168,35 @@ export default function App() {
 
   function handleNewSession() {
     dispatch({ type: 'NEW_SESSION' });
+    convIdRef.current = null;
+    streamTextRef.current = '';
+    prevMsgLenRef.current = 0;
   }
+
   function handleSelectConv(conv) {
-    dispatch({ type: 'LOAD_CONVERSATION', data: conv });
+    dispatch({ type: 'LOAD_CONV', data: conv });
+    convIdRef.current = conv.id;
+    prevMsgLenRef.current = (conv.allMessages || conv.messages || []).length;
     setShowHistory(false);
   }
 
   const hasContent = state.allMessages.length > 0 || state.isStreaming;
-  // Combined messages: saved allMessages + in-progress aiMessages
-  const displayMessages = [
-    ...state.allMessages,
-    ...state.aiMessages.filter(m => !state.allMessages.some(am => am.content === m.content && am.name === m.name)),
-  ];
+
+  if (!state.loaded) {
+    return <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', color: 'var(--text-muted)' }}>加载中...</div>;
+  }
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)' }}>
       <HistoryDrawer open={showHistory} onClose={() => setShowHistory(false)}
-        onSelect={handleSelectConv} currentId={state.conversationId} />
+        onSelect={handleSelectConv} currentId={convIdRef.current || state.conversationId} />
       <Header darkMode={state.darkMode} onToggleDark={() => dispatch({ type: 'TOGGLE_DARK' })}
         onReset={handleNewSession} onSettings={() => setShowSettings(!showSettings)}
         onHistory={() => setShowHistory(true)} hasHistory={true} />
 
       {showSettings && (
         <div style={{ padding: '14px 16px', background: 'var(--bg-input)', borderBottom: '1px solid var(--border-subtle)' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>DeepSeek API Key</div>
+          <div style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>DeepSeek API Key</div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} placeholder="sk-..."
               style={{ flex: 1, height: '38px', padding: '0 12px', borderRadius: '10px', border: '1.5px solid var(--border-subtle)', fontSize: '0.85rem', fontFamily: 'monospace', background: 'var(--bg-chat)', color: 'var(--text-primary)' }} />
@@ -159,11 +205,18 @@ export default function App() {
         </div>
       )}
 
-      {/* Chat area */}
       <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
         {state.topic && <div style={{ textAlign: 'center', padding: '12px 24px 8px' }}>
           <span style={{ display: 'inline-block', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bubble-moderator-bg)', padding: '4px 14px', borderRadius: '12px' }}>{state.topic}</span>
         </div>}
+
+        {!hasContent && hasApiKey && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: 40, textAlign: 'center' }}>
+            <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🏛️</div>
+            <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>圆桌会</div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>输入议题，开启一场思想对话</div>
+          </div>
+        )}
 
         {!hasContent && !hasApiKey && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: 40, textAlign: 'center' }}>
@@ -173,25 +226,22 @@ export default function App() {
             <button onClick={() => setShowSettings(true)} style={{ padding: '10px 24px', borderRadius: '20px', border: '1.5px solid var(--border-subtle)', background: 'var(--bg-input)', color: 'var(--text-secondary)', fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>⚙️ 设置 API Key</button>
           </div>
         )}
-        {!hasContent && hasApiKey && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: 40, textAlign: 'center' }}>
-            <div style={{ fontSize: '3.5rem', marginBottom: 12 }}>🏛️</div>
-            <div style={{ fontFamily: "'Noto Serif SC', serif", fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>圆桌会</div>
-            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>输入议题，开启一场思想对话</div>
-          </div>
-        )}
 
-        {/* Display all messages */}
-        {displayMessages.map((msg, i) => (
-          <ChatBubble key={i} message={msg} darkMode={state.darkMode}
+        {/* Saved messages */}
+        {state.allMessages.map((msg, i) => (
+          <ChatBubble key={`s-${i}`} message={msg} darkMode={state.darkMode}
             style={{ animationDelay: `${Math.min(i * 0.03, 0.2)}s` }} />
         ))}
 
-        {/* Streaming: currently-being-typed message */}
-        {state.streamingMsg && (
-          <ChatBubble message={{ ...state.streamingMsg, isComplete: false }} darkMode={state.darkMode} />
-        )}
-        {state.isStreaming && !state.streamingMsg && displayMessages.length === 0 && <LoadingDots />}
+        {/* In-progress AI messages */}
+        {(state.aiMessages || []).filter(m => !state.allMessages.some(am => am.content === m.content && am.name === m.name))
+          .map((msg, i) => (
+            <ChatBubble key={`ai-${i}`} message={msg} darkMode={state.darkMode} />
+          ))}
+
+        {/* Streaming partial message */}
+        {state.streamingMsg && <ChatBubble message={state.streamingMsg} darkMode={state.darkMode} />}
+        {state.isStreaming && !state.streamingMsg && (!state.aiMessages || state.aiMessages.length === 0) && <LoadingDots />}
 
         {state.error && <div style={{ textAlign: 'center', padding: 16 }}>
           <span style={{ background: '#FEE2E2', color: '#991B1B', fontSize: '0.8rem', padding: '8px 14px', borderRadius: '10px' }}>⚠️ {state.error}</span>
