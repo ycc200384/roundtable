@@ -1,133 +1,112 @@
 /**
- * 圆桌会 API 服务
- * DeepSeek API 直连 + 响应解析
+ * 圆桌会 API — 基于李继刚 ljg-roundtable 技能
  */
-
-const DEEPSEEK_URL = "https://api.deepseek.com/anthropic/v1/messages";
+const URL = "https://api.deepseek.com/anthropic/v1/messages";
 const MODEL = "deepseek-v4-pro[1m]";
 
-const SYSTEM_PROMPT = `你是一个群聊里的多位AI人物。像微信群聊一样自然对话。
+const SYSTEM_PROMPT = `你是李继刚"圆桌讨论"技能驱动的对话引擎。严格按以下框架运行，但输出为自然群聊格式。
 
-## 人物创建
-当用户提出一个话题时，你先简短宣布参会人物（每人一句话姓名+立场），然后大家开始像朋友群聊一样自然地讨论。不需要MBTI，不需要正式格式。
+## 核心框架（不可偏离）
 
-## 发言格式（重要！）
-每个人物发言格式：
+### 1. 选人
+根据议题选3-5位**真实历史/当代人物**。必须：真实人物（如尼采、王阳明、鲁迅、波伏娃），立场形成张力网络，至少一位意外视角。
+
+主持人用自然语言介绍参会者：
+主持人：今天讨论「{议题}」。我邀请了 [列出3-5人，每人一句话简介+立场]
+
+### 2. 开场
+主持人提出定义性问题，然后各位依次发言。
+
+### 3. 辩论循环
+- 发言必须回应前面的人，引用其经典观点
+- 主持人在适当时候做简短综述，提炼核心争议点
+- 主持人偶尔提出深层引导问题
+- 像真人群聊：有锋芒、可质疑、可赞同
+
+### 4. 用户互动
+用户可能：继续讨论/质疑/换角度/要求总结/请新人物加入
+自然回应，保持对话流畅。
+
+## 输出格式（铁律）
 名字：发言内容
 
-主持人发言格式：
+主持人发言：
 主持人：发言内容
 
-每段发言要像真人聊天一样自然、有锋芒。引用经典观点但不要背书腔。可以质疑、开玩笑、跑题再拉回来。像深夜朋友群聊。
-
-## 讨论节奏
-- 每轮选2-3人发言即可，不用所有人都说
-- 有人说完，其他人可以接话、反驳、补充
-- 主持人偶尔引导一下深层问题
-- 每段发言控制在手机屏幕能看完的长度（3-5句话）
-- 讨论3-4轮后主持人可以做个简短小结
-
-## 用户互动
-用户可能会：
-- 继续讨论 → 接着聊
-- 提出质疑 → 人物回应
-- 换个话题 → 重新开聊
-- 要求总结 → 主持人总结
-- 邀请新人物 → 新人物加入群聊
-- 查看之前的观点 → 回顾讨论
-
-你要像真人群聊一样自然回应。`;
+每段发言3-5句话，像真人聊天。不要用【】符号，不要行动标签。
+不要编造人物名。必须使用真实历史/当代人物。`;
 
 function getApiKey() {
   const key = localStorage.getItem('deepseek_api_key');
-  if (!key) throw new Error('未设置 API Key。请点击左上角 ⚙️ 设置。');
+  if (!key) throw new Error('未设置 API Key');
   return key;
 }
-
-export function setApiKey(key) { localStorage.setItem('deepseek_api_key', key.trim()); }
+export function setApiKey(k) { localStorage.setItem('deepseek_api_key', k.trim()); }
 export function getStoredApiKey() { return localStorage.getItem('deepseek_api_key') || ''; }
 
-/**
- * 流式调用 DeepSeek
- */
 export async function* streamChat(messages) {
   const apiKey = getApiKey();
-  const response = await fetch(DEEPSEEK_URL, {
+  const resp = await fetch(URL, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
     body: JSON.stringify({ model: MODEL, system: SYSTEM_PROMPT, messages, max_tokens: 8192, stream: true }),
   });
+  if (!resp.ok) { const e = await resp.text(); throw new Error(`API ${resp.status}`); }
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`API ${response.status}: ${err.slice(0, 200)}`);
-  }
-
-  const reader = response.body.getReader();
+  const reader = resp.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
-
+  let buf = "";
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === "content_block_delta") {
-            const text = data.delta?.text || "";
-            if (text) yield { text };
-          } else if (data.type === "message_stop") {
-            yield { done: true };
-          }
-        } catch {}
-      }
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n"); buf = lines.pop() || "";
+    for (const l of lines) {
+      if (l.startsWith("data: ")) try {
+        const d = JSON.parse(l.slice(6));
+        if (d.type === "content_block_delta") { const t = d.delta?.text; if (t) yield { text: t }; }
+        else if (d.type === "message_stop") yield { done: true };
+      } catch {}
     }
   }
 }
 
 /**
- * 解析 AI 回复为消息列表
- * 格式：名字：内容 / 主持人：内容
+ * 渐进式解析：边流边拆名字：内容
+ * 返回当前已完成的完整消息 + 当前正在输入的消息
  */
-export function parseResponse(text) {
+export function progressiveParse(fullText) {
   const messages = [];
-  const lines = text.split("\n");
-  let currentName = null;
-  let currentContent = [];
-
-  function flushMessage() {
-    if (currentName && currentContent.length) {
-      const content = currentContent.join("\n").trim();
-      if (content) {
-        messages.push({
-          type: "speech",
-          name: currentName,
-          content,
-        });
-      }
-    }
-    currentContent = [];
-  }
+  const lines = fullText.split("\n");
+  let current = null;
 
   for (const line of lines) {
-    // Match "名字：内容" or "名字: 内容"
-    const match = line.match(/^(.{1,8})[：:]\s*(.+)/);
-    if (match && !line.startsWith("http") && line.length < 200) {
-      flushMessage();
-      currentName = match[1].trim();
-      currentContent = [match[2]];
-    } else if (currentName) {
-      currentContent.push(line);
+    const match = line.match(/^(.{1,10})[：:]\s*(.+)/);
+    if (match && !line.startsWith("http")) {
+      if (current && current.content.trim()) messages.push(current);
+      current = { type: "speech", name: match[1].trim(), content: match[2] };
+    } else if (current) {
+      current.content += "\n" + line;
     }
   }
-  flushMessage();
-  return messages;
+
+  if (current && current.content.trim()) {
+    messages.push({ ...current, isComplete: true });
+  }
+
+  // The last message might be incomplete (still streaming)
+  // Mark all except the last as complete
+  if (messages.length > 0) {
+    messages[messages.length - 1] = { ...messages[messages.length - 1], isComplete: true };
+  }
+
+  // Return the current streaming line if any
+  const lastLine = lines[lines.length - 1] || "";
+  const streamingMatch = lastLine.match(/^(.{1,10})[：:]\s*(.+)/);
+  let streamingMsg = null;
+  if (streamingMatch && !lastLine.startsWith("http")) {
+    streamingMsg = { type: "speech", name: streamingMatch[1].trim(), content: streamingMatch[2], isStreaming: true };
+  }
+
+  return { messages, streamingMsg };
 }
