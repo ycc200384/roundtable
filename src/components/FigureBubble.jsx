@@ -1,108 +1,59 @@
-import { getAvatarUrl } from '../services/api';
+import { getAvatar } from '../services/avatars';
 
-export default function FigureBubble({ name, action, content, seed, darkMode, style }) {
-  const lines = content.split('\n');
-  const summaryIndex = lines.findIndex(l => l.trim().startsWith('**简言之**'));
-  const mainLines = summaryIndex >= 0 ? lines.slice(0, summaryIndex) : lines;
-  const summaryLine = summaryIndex >= 0 ? lines[summaryIndex] : null;
+export default function FigureBubble({ name, content, darkMode, style }) {
+  const isModerator = name === '主持人';
+  const avatar = getAvatar(name);
 
   return (
     <div style={{
-      display: 'flex',
-      alignItems: 'flex-start',
-      gap: '10px',
-      padding: '10px 14px',
-      animation: 'fadeUp 0.3s ease forwards',
-      opacity: 0,
-      ...style,
+      display: 'flex', alignItems: 'flex-start', gap: '10px',
+      padding: '8px 14px', animation: 'msgIn 0.35s ease forwards',
+      opacity: 0, ...style,
     }}>
       {/* Avatar */}
-      <img
-        src={getAvatarUrl(name, seed || name)}
-        alt={name}
+      <div
+        dangerouslySetInnerHTML={{ __html: avatar }}
         style={{
-          width: '42px',
-          height: '42px',
-          borderRadius: '50%',
-          flexShrink: 0,
-          background: 'var(--avatar-bg, #e8e8e8)',
-        }}
-        onError={(e) => {
-          e.target.style.display = 'none';
-          e.target.nextSibling.style.display = 'flex';
+          width: '40px', height: '40px', borderRadius: '50%',
+          flexShrink: 0, overflow: 'hidden',
+          boxShadow: isModerator
+            ? '0 0 0 2px #8D6E63, 0 2px 6px rgba(0,0,0,0.1)'
+            : '0 2px 6px rgba(0,0,0,0.1)',
         }}
       />
-      {/* Fallback avatar (emoji + color) */}
-      <div style={{
-        width: '42px', height: '42px', borderRadius: '50%',
-        flexShrink: 0, display: 'none',
-        alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.2rem', fontWeight: 700,
-        background: getColorFromName(name, darkMode),
-        color: '#fff',
-      }}>
-        {name[0]}
-      </div>
 
-      {/* Message body */}
+      {/* Message */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Name + action tag */}
         <div style={{
-          display: 'flex', alignItems: 'baseline', gap: '6px',
-          marginBottom: '3px', paddingLeft: '2px',
+          fontSize: '0.75rem', fontWeight: 600, marginBottom: '2px', paddingLeft: '2px',
+          color: isModerator
+            ? (darkMode ? '#BCAAA4' : '#6D5D4B')
+            : (darkMode ? '#D1D5DB' : '#4B5563'),
         }}>
-          <span style={{
-            fontSize: '0.8rem', fontWeight: 600,
-            color: darkMode ? '#D1D5DB' : '#374151',
-          }}>
-            {name}
-          </span>
-          <span style={{
-            fontSize: '0.65rem',
-            color: 'var(--text-muted)',
-          }}>
-            {action}
-          </span>
-        </div>
-
-        {/* Bubble */}
-        <div style={{
-          background: darkMode ? '#1f2937' : '#FFFFFF',
-          borderRadius: '4px 16px 16px 16px',
-          padding: '10px 14px',
-          fontSize: '0.9375rem',
-          lineHeight: '1.6',
-          color: darkMode ? '#E5E7EB' : '#1F2937',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}>
-          {mainLines.join('\n').trim()}
-          {summaryLine && (
-            <div style={{
-              marginTop: '8px',
-              paddingTop: '8px',
-              borderTop: '1px solid ' + (darkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-              fontSize: '0.8rem',
-              color: darkMode ? '#9CA3AF' : '#6B7280',
-              fontWeight: 500,
-            }}>
-              💡 {summaryLine.replace('**简言之**：', '').replace('**简言之**:', '').trim()}
-            </div>
+          {name}
+          {isModerator && (
+            <span style={{
+              fontSize: '0.6rem', fontWeight: 400, marginLeft: '4px',
+              color: darkMode ? '#8B7E74' : '#A09080',
+            }}>群主</span>
           )}
+        </div>
+        <div style={{
+          background: isModerator
+            ? (darkMode ? '#2a2520' : '#F5F0E8')
+            : (darkMode ? '#1f2937' : '#FFFFFF'),
+          borderRadius: isModerator ? '12px' : '4px 14px 14px 14px',
+          padding: '9px 13px', fontSize: '0.9375rem', lineHeight: '1.6',
+          color: darkMode ? '#E5E7EB' : '#1F2937',
+          boxShadow: isModerator ? 'none' : '0 1px 2px rgba(0,0,0,0.05)',
+          border: isModerator
+            ? `1px solid ${darkMode ? '#3d352e' : '#E0D5C0'}`
+            : 'none',
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+        }}>
+          {content}
         </div>
       </div>
     </div>
   );
-}
-
-function getColorFromName(name, darkMode) {
-  const colors = darkMode
-    ? ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#06b6d4']
-    : ['#4f46e5', '#7c3aed', '#db2777', '#e11d48', '#ea580c', '#ca8a04', '#16a34a', '#0891b2'];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
 }
