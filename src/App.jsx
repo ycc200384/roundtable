@@ -64,6 +64,7 @@ export default function App() {
   const stateRef = useRef(state); stateRef.current = state;
   const streamTextRef = useRef('');
   const convIdRef = useRef(null);
+  const [nearBottom, setNearBottom] = useState(true);
 
   const [showSettings, setShowSettings] = useState(false);
   const [keyInput, setKeyInput] = useState(getStoredApiKey());
@@ -118,10 +119,18 @@ export default function App() {
     localStorage.setItem('roundtable_dark_mode', state.darkMode);
   }, [state.darkMode]);
 
-  // Auto-scroll
+  // Auto-scroll: only if user is at bottom
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (nearBottom) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [state.allMessages, state.streamingMsg]);
+
+  function handleChatScroll(e) {
+    const el = e.target;
+    const d = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setNearBottom(d < 80);
+  }
 
   // Auto-save after stream finishes
   const prevMsgLenRef = useRef(0);
@@ -205,10 +214,24 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '8px' }}
+        onScroll={handleChatScroll}>
         {state.topic && <div style={{ textAlign: 'center', padding: '12px 24px 8px' }}>
           <span style={{ display: 'inline-block', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bubble-moderator-bg)', padding: '4px 14px', borderRadius: '12px' }}>{state.topic}</span>
         </div>}
+
+        {/* New conversation button */}
+        {state.topic && !state.isStreaming && (
+          <div style={{ textAlign: 'center', padding: '4px 0 8px' }}>
+            <button onClick={handleNewSession} style={{
+              padding: '6px 16px', borderRadius: '14px', border: '1.5px dashed var(--border-subtle)',
+              background: 'transparent', color: 'var(--text-muted)', fontSize: '0.75rem',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              ✨ 开启新话题
+            </button>
+          </div>
+        )}
 
         {!hasContent && hasApiKey && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', padding: 40, textAlign: 'center' }}>
@@ -242,6 +265,19 @@ export default function App() {
         {/* Streaming partial message */}
         {state.streamingMsg && <ChatBubble message={state.streamingMsg} darkMode={state.darkMode} />}
         {state.isStreaming && !state.streamingMsg && (!state.aiMessages || state.aiMessages.length === 0) && <LoadingDots />}
+
+        {/* Scroll-to-bottom button */}
+        {!nearBottom && (
+          <div style={{ position: 'sticky', bottom: 8, textAlign: 'center' }}>
+            <button onClick={() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); setNearBottom(true); }}
+              style={{
+                padding: '6px 14px', borderRadius: '16px', border: 'none',
+                background: 'var(--bg-input)', color: 'var(--text-secondary)',
+                fontSize: '0.75rem', cursor: 'pointer', fontFamily: 'inherit',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              }}>↓ 最新消息</button>
+          </div>
+        )}
 
         {state.error && <div style={{ textAlign: 'center', padding: 16 }}>
           <span style={{ background: '#FEE2E2', color: '#991B1B', fontSize: '0.8rem', padding: '8px 14px', borderRadius: '10px' }}>⚠️ {state.error}</span>
