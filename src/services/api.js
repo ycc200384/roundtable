@@ -163,10 +163,7 @@ export function progressiveParse(fullText) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-
-    // Match 【主持】：content
     const modMatch = line.match(/^【主持】：(.*)/);
-    // Match 【Name】【Action】：content
     const figMatch = line.match(/^【(.+?)】【(.+?)】：(.*)/);
 
     if (modMatch) {
@@ -174,31 +171,21 @@ export function progressiveParse(fullText) {
       current = { type: "speech", name: "主持人", content: modMatch[1] };
     } else if (figMatch) {
       if (current && current.content.trim()) messages.push({ ...current });
-      current = {
-        type: "speech",
-        name: figMatch[1].trim(),
-        content: figMatch[3], // strip the 【】 prefix, keep the speech
-      };
+      current = { type: "speech", name: figMatch[1].trim(), content: figMatch[3] };
     } else if (current) {
       current.content += "\n" + line;
     }
   }
 
-  // Check if text appears done (last line looks complete)
-  const done = fullText.match(/开放问题|知识网络|全局总结|指令:.*可.*止/) != null;
+  // Push the last message (complete or not)
   if (current && current.content.trim()) {
-    messages.push({ ...current, isComplete: !done ? undefined : true });
+    messages.push({ ...current });
   }
 
-  let streamingMsg = null;
-  // If the last message seems incomplete, pull it out as streaming
-  if (!done && messages.length > 0) {
-    const last = messages[messages.length - 1];
-    if (last.name && last.content && !last.content.trim().endsWith("**简言之**")) {
-      streamingMsg = messages.pop();
-      streamingMsg.isStreaming = true;
-    }
+  // If nothing parsed but we have text, show it all as moderator
+  if (messages.length === 0 && fullText.trim()) {
+    messages.push({ type: "speech", name: "主持人", content: fullText.trim() });
   }
 
-  return { messages, streamingMsg };
+  return { messages, streamingMsg: null };
 }

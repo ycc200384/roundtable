@@ -35,8 +35,8 @@ function reducer(state, action) {
     case 'START_STREAM':
       return { ...state, isStreaming: true, error: null, streamingMsg: null };
     case 'UPDATE_STREAM': {
-      const { messages, streamingMsg } = progressiveParse(action.fullText);
-      return { ...state, streamingMsg, aiMessages: messages };
+      const { messages } = progressiveParse(action.fullText);
+      return { ...state, streamingMsg: null, aiMessages: messages };
     }
     case 'FINISH_STREAM': {
       const parsed = action.parsed || [];
@@ -250,21 +250,20 @@ export default function App() {
           </div>
         )}
 
-        {/* Saved messages */}
+        {/* All completed messages */}
         {state.allMessages.map((msg, i) => (
           <ChatBubble key={`s-${i}`} message={msg} darkMode={state.darkMode}
             style={{ animationDelay: `${Math.min(i * 0.03, 0.2)}s` }} />
         ))}
 
-        {/* In-progress AI messages */}
-        {(state.aiMessages || []).filter(m => !state.allMessages.some(am => am.content === m.content && am.name === m.name))
-          .map((msg, i) => (
-            <ChatBubble key={`ai-${i}`} message={msg} darkMode={state.darkMode} />
-          ))}
+        {/* AI messages streaming in */}
+        {(state.aiMessages || []).map((msg, i) => (
+          <ChatBubble key={`ai-${i}`} message={msg} darkMode={state.darkMode}
+            style={{ animationDelay: '0s' }} />
+        ))}
 
-        {/* Streaming partial message */}
-        {state.streamingMsg && <ChatBubble message={state.streamingMsg} darkMode={state.darkMode} />}
-        {state.isStreaming && !state.streamingMsg && (!state.aiMessages || state.aiMessages.length === 0) && <LoadingDots />}
+        {/* Loading indicator when nothing yet */}
+        {state.isStreaming && (!state.aiMessages || state.aiMessages.length === 0) && <LoadingDots />}
 
         {/* Scroll-to-bottom button */}
         {!nearBottom && (
