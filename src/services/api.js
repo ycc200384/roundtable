@@ -111,42 +111,78 @@ export async function* streamChat(messages) {
     if (done) break;
 
     buf += decoder.decode(value, { stream: true });
-    const lines = buf.split("\n"); buf = lines.pop() || "";
 
-    for (const l of lines) {
-      const s = l.trim();
+    // Process complete SSE events (separated by \n\n or \n)
+    const parts = buf.split("\n");
+    buf = parts.pop() || ""; // keep incomplete last line
+
+    for (const line of parts) {
+      const s = line.trim();
       if (!s.startsWith("data:")) continue;
 
-      try {
-        const d = JSON.parse(s.slice(5).trim());
+      const jsonStr = s.slice(5).trim();
+      if (jsonStr === "[DONE]") { yield { done: true }; continue; }
 
-        // Anthropic format: content_block_delta → delta.text
-        if (d.type === "content_block_delta") {
-          const t = d.delta?.text || "";
-          if (t) yield { text: t };
+      try {
+        const d = JSON.parse(jsonStr);
+
+        // Extract text from any known structure
+        let text = null;
+
+        // Anthropic: content_block_delta.delta.text
+        if (d.type === "content_block_delta" || d.type === "text_delta") {
+          text = d.delta?.text;
         }
-        // Anthropic format: content_block_start → content_block.text (initial)
+        // Anthropic: content_block_start.content_block.text
         else if (d.type === "content_block_start") {
-          const t = d.content_block?.text || "";
-          if (t) yield { text: t };
+          text = d.content_block?.text;
         }
-        // OpenAI/alternate format: choices[0].delta.content
+        // OpenAI: choices[0].delta.content
         else if (d.choices?.[0]?.delta?.content) {
-          yield { text: d.choices[0].delta.content };
+          text = d.choices[0].delta.content;
         }
-        // Generic text field
-        else if (d.text && !d.type) {
-          yield { text: d.text };
+        // OpenAI: choices[0].text
+        else if (d.choices?.[0]?.text) {
+          text = d.choices[0].text;
         }
-        // Stream end
-        if (d.type === "message_stop" || d.type === "message_delta" && d.delta?.stop_reason) {
+        // Generic: any .text or .content at root
+        else if (typeof d.text === "string") {
+          text = d.text;
+        }
+        else if (typeof d.content === "string") {
+          text = d.content;
+        }
+        // Deep search: find first string value under "text" or "content" key anywhere
+        else {
+          text = findTextInObject(d);
+        }
+
+        if (text) yield { text };
+
+        // Done?
+        if (d.type === "message_stop" || d.stop_reason || d.choices?.[0]?.finish_reason) {
           yield { done: true };
         }
-      } catch { /* skip non-JSON or unknown formats */ }
+      } catch {
+        // If we have raw text in the data line, yield it directly
+        if (jsonStr.length > 2 && !jsonStr.startsWith("{")) {
+          yield { text: jsonStr };
+        }
+      }
     }
   }
-  // Stream finished
   yield { done: true };
+
+  function findTextInObject(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    if (obj.text && typeof obj.text === "string") return obj.text;
+    if (obj.content && typeof obj.content === "string") return obj.content;
+    for (const v of Object.values(obj)) {
+      const r = findTextInObject(v);
+      if (r) return r;
+    }
+    return null;
+  }
 }
 
 // ===== 前端解析：把原版输出转为聊天消息 =====
