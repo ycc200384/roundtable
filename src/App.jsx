@@ -168,8 +168,12 @@ export default function App() {
           dispatch({ type: 'UPDATE_STREAM', fullText: streamTextRef.current });
         }
       }
-      const final = progressiveParse(streamTextRef.current);
-      dispatch({ type: 'FINISH_STREAM', parsed: final.messages, content: streamTextRef.current });
+      if (!streamTextRef.current) {
+        dispatch({ type: 'SET_ERROR', error: 'AI 未返回内容，请重试' });
+      } else {
+        const final = progressiveParse(streamTextRef.current);
+        dispatch({ type: 'FINISH_STREAM', parsed: final.messages, content: streamTextRef.current });
+      }
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || '连接失败' });
     }

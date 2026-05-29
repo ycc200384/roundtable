@@ -110,62 +110,39 @@ export async function* streamChat(messages) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    buf += decoder.decode(value, { stream: true });
+    const raw = decoder.decode(value, { stream: true });
+    buf += raw;
 
-    // Process complete SSE events (separated by \n\n or \n)
-    const parts = buf.split("\n");
-    buf = parts.pop() || ""; // keep incomplete last line
+    // Try to extract text from the accumulated buffer
+    // Handle both SSE format (data: {...}) and raw JSON lines
 
-    for (const line of parts) {
-      const s = line.trim();
-      if (!s.startsWith("data:")) continue;
+    const lines = buf.split("\n");
+    buf = lines.pop() || "";
 
-      const jsonStr = s.slice(5).trim();
+    for (const line of lines) {
+      let jsonStr = line.trim();
+      if (!jsonStr) continue;
+
+      // Strip "data: " prefix if present
+      if (jsonStr.startsWith("data:")) {
+        jsonStr = jsonStr.slice(5).trim();
+      }
+      // Skip event: lines
+      if (line.startsWith("event:") || !jsonStr) continue;
       if (jsonStr === "[DONE]") { yield { done: true }; continue; }
 
+      // Try JSON parse
       try {
         const d = JSON.parse(jsonStr);
-
-        // Extract text from any known structure
-        let text = null;
-
-        // Anthropic: content_block_delta.delta.text
-        if (d.type === "content_block_delta" || d.type === "text_delta") {
-          text = d.delta?.text;
-        }
-        // Anthropic: content_block_start.content_block.text
-        else if (d.type === "content_block_start") {
-          text = d.content_block?.text;
-        }
-        // OpenAI: choices[0].delta.content
-        else if (d.choices?.[0]?.delta?.content) {
-          text = d.choices[0].delta.content;
-        }
-        // OpenAI: choices[0].text
-        else if (d.choices?.[0]?.text) {
-          text = d.choices[0].text;
-        }
-        // Generic: any .text or .content at root
-        else if (typeof d.text === "string") {
-          text = d.text;
-        }
-        else if (typeof d.content === "string") {
-          text = d.content;
-        }
-        // Deep search: find first string value under "text" or "content" key anywhere
-        else {
-          text = findTextInObject(d);
-        }
-
+        let text = extractText(d);
         if (text) yield { text };
 
-        // Done?
         if (d.type === "message_stop" || d.stop_reason || d.choices?.[0]?.finish_reason) {
           yield { done: true };
         }
       } catch {
-        // If we have raw text in the data line, yield it directly
-        if (jsonStr.length > 2 && !jsonStr.startsWith("{")) {
+        // Not JSON - if it looks like readable text, yield it
+        if (jsonStr.length > 2 && !jsonStr.startsWith("{") && !jsonStr.startsWith("[")) {
           yield { text: jsonStr };
         }
       }
@@ -173,12 +150,21 @@ export async function* streamChat(messages) {
   }
   yield { done: true };
 
-  function findTextInObject(obj) {
-    if (!obj || typeof obj !== "object") return null;
-    if (obj.text && typeof obj.text === "string") return obj.text;
-    if (obj.content && typeof obj.content === "string") return obj.content;
+  function extractText(obj, depth = 0) {
+    if (!obj || typeof obj !== "object" || depth > 10) return null;
+    // Direct text properties
+    if (typeof obj.text === "string" && obj.text) return obj.text;
+    if (typeof obj.content === "string" && obj.content) return obj.content;
+    // Anthropic: delta.text
+    if (obj.delta?.text) return obj.delta.text;
+    // OpenAI: choices[0].delta.content
+    if (obj.choices?.[0]?.delta?.content) return obj.choices[0].delta.content;
+    if (obj.choices?.[0]?.text) return obj.choices[0].text;
+    // Content block
+    if (obj.content_block?.text) return obj.content_block.text;
+    // Deep search
     for (const v of Object.values(obj)) {
-      const r = findTextInObject(v);
+      const r = extractText(v, depth + 1);
       if (r) return r;
     }
     return null;
