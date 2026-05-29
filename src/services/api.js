@@ -161,28 +161,50 @@ export function progressiveParse(fullText) {
   const lines = fullText.split("\n");
   let current = null;
 
+  // Known figure names collected so we can recognize "Name：" patterns
+  const knownNames = new Set();
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const modMatch = line.match(/^【主持】：(.*)/);
-    const figMatch = line.match(/^【(.+?)】【(.+?)】：(.*)/);
+    const t = line.trim();
+
+    // Match 【主持】：content  or  主持人：content
+    const modMatch = t.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
+    // Match 【Name】【Action】：content
+    const figMatch = t.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
+    // Match known figure name followed by ：（plain format, no brackets）
+    let plainMatch = null;
+    for (const name of knownNames) {
+      if (t.startsWith(name + '：') || t.startsWith(name + ':')) {
+        plainMatch = { name, content: t.slice(name.length + 1).trim() };
+        break;
+      }
+    }
 
     if (modMatch) {
-      if (current && current.content.trim()) messages.push({ ...current });
+      if (current?.content.trim()) messages.push({ ...current });
       current = { type: "speech", name: "主持人", content: modMatch[1] };
     } else if (figMatch) {
-      if (current && current.content.trim()) messages.push({ ...current });
-      current = { type: "speech", name: figMatch[1].trim(), content: figMatch[3] };
+      if (current?.content.trim()) messages.push({ ...current });
+      const name = figMatch[1].trim();
+      knownNames.add(name);
+      current = { type: "speech", name, content: figMatch[3] };
+    } else if (plainMatch) {
+      if (current?.content.trim()) messages.push({ ...current });
+      current = { type: "speech", name: plainMatch.name, content: plainMatch.content };
     } else if (current) {
+      // Continue previous message
       current.content += "\n" + line;
+    } else if (t) {
+      // Stray text with no speaker yet → start as moderator
+      current = { type: "speech", name: "主持人", content: t };
     }
   }
 
-  // Push the last message (complete or not)
-  if (current && current.content.trim()) {
+  if (current?.content.trim()) {
     messages.push({ ...current });
   }
 
-  // If nothing parsed but we have text, show it all as moderator
   if (messages.length === 0 && fullText.trim()) {
     messages.push({ type: "speech", name: "主持人", content: fullText.trim() });
   }
