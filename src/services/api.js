@@ -105,19 +105,48 @@ export async function* streamChat(messages) {
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+
     buf += decoder.decode(value, { stream: true });
     const lines = buf.split("\n"); buf = lines.pop() || "";
+
     for (const l of lines) {
-      if (l.startsWith("data: ")) try {
-        const d = JSON.parse(l.slice(6));
-        if (d.type === "content_block_delta") { const t = d.delta?.text; if (t) yield { text: t }; }
-        else if (d.type === "message_stop") yield { done: true };
-      } catch {}
+      const s = l.trim();
+      if (!s.startsWith("data:")) continue;
+
+      try {
+        const d = JSON.parse(s.slice(5).trim());
+
+        // Anthropic format: content_block_delta → delta.text
+        if (d.type === "content_block_delta") {
+          const t = d.delta?.text || "";
+          if (t) yield { text: t };
+        }
+        // Anthropic format: content_block_start → content_block.text (initial)
+        else if (d.type === "content_block_start") {
+          const t = d.content_block?.text || "";
+          if (t) yield { text: t };
+        }
+        // OpenAI/alternate format: choices[0].delta.content
+        else if (d.choices?.[0]?.delta?.content) {
+          yield { text: d.choices[0].delta.content };
+        }
+        // Generic text field
+        else if (d.text && !d.type) {
+          yield { text: d.text };
+        }
+        // Stream end
+        if (d.type === "message_stop" || d.type === "message_delta" && d.delta?.stop_reason) {
+          yield { done: true };
+        }
+      } catch { /* skip non-JSON or unknown formats */ }
     }
   }
+  // Stream finished
+  yield { done: true };
 }
 
 // ===== 前端解析：把原版输出转为聊天消息 =====
