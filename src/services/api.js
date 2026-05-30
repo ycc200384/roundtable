@@ -165,59 +165,73 @@ export async function* streamChat(messages) {
 // 不修改 skill 内容，只做格式转换
 
 export function progressiveParse(fullText) {
+  if (!fullText?.trim()) return { messages: [], streamingMsg: null };
+
   const messages = [];
   const lines = fullText.split('\n');
   let current = null;
+  const seenNames = new Set();
 
   for (const line of lines) {
     let t = line.trim();
     if (!t) continue;
+    if (/^[-*_]{3,}$/.test(t)) continue;
+    if (/^#{1,6}\s/.test(t)) continue;
 
-    // Skip markdown dividers and headings
-    if (/^[-*_]{3,}$/.test(t) || /^#{1,6}\s/.test(t)) continue;
-
-    // Strip leading bullet/list markers for matching
+    // Strip bullet/list markers
     const clean = t.replace(/^[-*+·•]\s*/, '').trim();
 
-    // Match 主持人：content (with or without 【】brackets)
-    const modM = clean.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
-    // Match 【Name】【Action】：content
-    const figM = clean.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
-    // Also match plain "Name：content" if we've seen this name before in bracket format
-    // This handles cases where the AI switches between 【】 and plain format
+    // === SPEAKER DETECTION ===
+    // Pattern 1: 【主持】： or 主持人： (with or without **bold**)
+    const modMatch = clean.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
 
-    if (modM) {
-      if (current?.content?.trim()) messages.push({ ...current });
-      current = { type: 'speech', name: '主持人', content: cleanText(modM[1]) };
-    } else if (figM) {
-      if (current?.content?.trim()) messages.push({ ...current });
-      current = { type: 'speech', name: figM[1].trim(), content: cleanText(figM[3]) };
+    // Pattern 2: 【Name】【Action】： (original skill format)
+    const bracketMatch = clean.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
+
+    // Pattern 3: **Name**： or Name： (plain or bold name followed by colon)
+    let nameMatch = null;
+    if (!modMatch && !bracketMatch) {
+      const m = clean.match(/^(?:\*\*)?(.{2,16}?)(?:\*\*)?[：:]\s*(.+)/);
+      if (m) {
+        const candidate = m[1].trim();
+        const exclude = /^(主持人|简言之|总结|指令|问题|回答|讨论|议题|好的|我们|下一|本轮|核心|各位|如果|但是|因为|所以|一个|这个|那个|[\d]+|.*吗.*|.*什么.*|.*如何.*)$/;
+        // Accept if: seen before, OR looks like a Chinese name (2-12 chars), OR looks like a Western name
+        const looksLikeName = /^[一-鿿·]{2,12}$/.test(candidate) || /^[A-Za-z\s·]+$/.test(candidate);
+        if (!exclude.test(candidate) && (seenNames.has(candidate) || looksLikeName)) {
+          seenNames.add(candidate);
+          nameMatch = { name: candidate, content: m[2].trim() };
+        }
+      }
+    }
+
+    if (modMatch) {
+      if (current?.content?.trim()) messages.push(current);
+      current = { type: 'speech', name: '主持人', content: cleanText(modMatch[1]) };
+    } else if (bracketMatch) {
+      if (current?.content?.trim()) messages.push(current);
+      const name = bracketMatch[1].trim();
+      seenNames.add(name);
+      current = { type: 'speech', name, content: cleanText(bracketMatch[3]) };
+    } else if (nameMatch) {
+      if (current?.content?.trim()) messages.push(current);
+      current = { type: 'speech', name: nameMatch.name, content: cleanText(nameMatch.content) };
     } else if (current) {
-      // Continue previous message (multi-line content, 简言之, ASCII diagram, etc.)
       current.content += '\n' + cleanText(t);
     } else {
-      // Text before any recognized speaker → moderator
       current = { type: 'speech', name: '主持人', content: cleanText(t) };
     }
   }
 
-  if (current?.content?.trim()) {
-    messages.push({ ...current });
-  }
+  if (current?.content?.trim()) messages.push(current);
 
-  if (messages.length === 0 && fullText.trim()) {
+  if (messages.length === 0) {
     messages.push({ type: 'speech', name: '主持人', content: cleanText(fullText.trim()) });
   }
 
   return { messages, streamingMsg: null };
 }
 
-// Clean markdown formatting from text: remove **bold**, ###headings, - bullets
 function cleanText(text) {
   if (!text) return '';
-  return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/\n{3,}/g, '\n\n').trim();
 }
