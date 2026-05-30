@@ -197,17 +197,14 @@ export function progressiveParse(fullText) {
     // Pattern 2: 【Name】【Action】： (original skill format)
     const bracketMatch = clean.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
 
-    // Pattern 3: **Name**： or Name： (plain or bold name followed by colon)
+    // Pattern 3: ONLY match known figure names (seen in 【】 format before)
     let nameMatch = null;
     if (!modMatch && !bracketMatch) {
       const m = clean.match(/^(?:\*\*)?(.{2,16}?)(?:\*\*)?[：:]\s*(.+)/);
       if (m) {
         const candidate = m[1].trim();
-        const exclude = /^(主持人|简言之|总结|指令|问题|回答|讨论|议题|好的|我们|下一|本轮|核心|各位|如果|但是|因为|所以|一个|这个|那个|[\d]+|.*吗.*|.*什么.*|.*如何.*)$/;
-        // Accept if: seen before, OR looks like a Chinese name (2-12 chars), OR looks like a Western name
-        const looksLikeName = /^[一-鿿·]{2,12}$/.test(candidate) || /^[A-Za-z\s·]+$/.test(candidate);
-        if (!exclude.test(candidate) && (seenNames.has(candidate) || looksLikeName)) {
-          seenNames.add(candidate);
+        // ONLY accept if this name was previously introduced via 【】 format
+        if (seenNames.has(candidate)) {
           nameMatch = { name: candidate, content: m[2].trim() };
         }
       }
