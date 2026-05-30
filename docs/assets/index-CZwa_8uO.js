@@ -104,7 +104,13 @@ Error generating stack: `+e.message+`
           from { transform: translateX(-100%); }
           to { transform: translateX(0); }
         }
-      `})]}):null}function oe(e){let t=new Date(e),n=new Date-t;return n<36e5?`${Math.floor(n/6e4)}分钟前`:n<864e5?`${Math.floor(n/36e5)}小时前`:`${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,`0`)}`}var se=`https://api.deepseek.com/anthropic/v1/messages`,ce=`deepseek-v4-pro[1m]`,le=`为了执行本项技能，请严格按照以下步骤操作：
+      `})]}):null}function oe(e){let t=new Date(e),n=new Date-t;return n<36e5?`${Math.floor(n/6e4)}分钟前`:n<864e5?`${Math.floor(n/36e5)}小时前`:`${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,`0`)}`}var se=`https://api.deepseek.com/anthropic/v1/messages`,ce=`deepseek-v4-pro[1m]`,le=`重要：你在一个聊天应用中。用户的任何消息都必须触发圆桌讨论。禁止直接回答。即使用户说"给我个攒钱计划"，你也要选3-5位相关人物（如理财专家、哲学家、经济学家等）进行圆桌辩论。步骤2中"如果用户只说圆桌讨论未给议题"这条规则忽略——在聊天界面中，每条消息都是议题。
+
+---
+
+以下为圆桌讨论完整框架：
+
+为了执行本项技能，请严格按照以下步骤操作：
 
 1. **解析议题**
    从用户输入中提取核心议题。如果用户只说"圆桌讨论"未给议题，询问议题。
