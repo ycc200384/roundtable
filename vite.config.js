@@ -2,11 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Auto-increment version on each build
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+const VER_FILE = '.version';
+let ver = 1;
+if (existsSync(VER_FILE)) { ver = parseInt(readFileSync(VER_FILE, 'utf8')) + 1; }
+writeFileSync(VER_FILE, String(ver));
+
 export default defineConfig({
   base: '/roundtable/',
-  build: {
-    outDir: 'docs',
-  },
+  build: { outDir: 'docs' },
+  define: { __VERSION__: JSON.stringify(ver) },
   plugins: [
     react(),
     VitePWA({

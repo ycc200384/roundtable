@@ -9,10 +9,15 @@ export default function Header({ darkMode, onToggleDark, onReset, onSettings, on
         <HeaderBtn onClick={onHistory} label="📜" title="历史对话" />
         <HeaderBtn onClick={onSettings} label="⚙️" title="设置" />
       </div>
-      <span style={{
-        fontFamily: "'Noto Serif SC', serif", fontSize: '1.05rem',
-        fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.03em',
-      }}>圆桌会</span>
+      <div style={{ textAlign: 'center' }}>
+        <span style={{
+          fontFamily: "'Noto Serif SC', serif", fontSize: '1.05rem',
+          fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.03em',
+        }}>圆桌会</span>
+        <div style={{ fontSize: '0.55rem', color: 'var(--text-muted)', marginTop: '-1px' }}>
+          v{__VERSION__}
+        </div>
+      </div>
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
         <button onClick={onReset} style={{
           padding: '5px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)',
