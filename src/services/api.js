@@ -228,7 +228,10 @@ export function progressiveParse(fullText) {
     }
   }
 
-  if (current?.content?.trim()) messages.push(current);
+  if (current?.content?.trim()) {
+    const txt = current.content.trim();
+    if (txt.length > 2 && !/^主持人群主$/.test(txt)) messages.push(current);
+  }
 
   if (messages.length === 0) {
     messages.push({ type: 'speech', name: '主持人', content: cleanText(fullText.trim()) });
@@ -239,5 +242,11 @@ export function progressiveParse(fullText) {
 
 function cleanText(text) {
   if (!text) return '';
-  return text.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/\n{3,}/g, '\n\n').trim();
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/\([A-Z]{4}\)/g, '')     // remove (INTP) etc
+    .replace(/（[A-Z]{4}）/g, '')     // remove （INTP） etc
+    .trim();
 }
