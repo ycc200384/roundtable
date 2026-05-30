@@ -33,6 +33,8 @@ function reducer(state, action) {
       return { ...state, allMessages: [...state.allMessages, { type: 'user', content: action.content }] };
     case 'START_STREAM':
       return { ...state, isStreaming: true, error: null };
+    case 'PROGRESS':
+      return { ...state, allMessages: action.messages, isStreaming: true };
     case 'FINISH_BATCH':
       return { ...state, allMessages: action.messages, history: action.history, isStreaming: false };
     case 'SET_ERROR':
@@ -162,28 +164,47 @@ export default function App() {
 
     dispatch({ type: 'START_STREAM' });
     let fullText = '';
+    let lastCount = cur.allMessages.length;
 
     try {
       for await (const chunk of streamChat(newHistory)) {
         if (chunk.text) {
           fullText += chunk.text;
+          // Progressive parse: show completed messages as they arrive
+          const parsed = progressiveParse(fullText);
+          if (parsed.messages.length > 0) {
+            const newMsgs = [...cur.allMessages, ...parsed.messages];
+            if (newMsgs.length > lastCount) {
+              lastCount = newMsgs.length;
+              dispatch({ type: 'PROGRESS', messages: newMsgs });
+            }
+          }
         }
       }
       if (!fullText.trim()) {
         dispatch({ type: 'SET_ERROR', error: 'AI 未返回内容，请重试' });
       } else {
-        // Parse ALL at once after stream completes
         const parsed = progressiveParse(fullText);
         const newAllMessages = [...stateRef.current.allMessages, ...parsed.messages];
         const newFullHistory = [...newHistory];
         if (fullText.trim()) newFullHistory.push({ role: 'assistant', content: fullText.trim() });
+        dispatch({ type: 'FINISH_BATCH', messages: newAllMessages, history: newFullHistory });
 
-        // Dispatch all at once to avoid race conditions
-        dispatch({
-          type: 'FINISH_BATCH',
-          messages: newAllMessages,
-          history: newFullHistory,
-        });
+        // Save immediately after response
+        const cur2 = stateRef.current;
+        if (newAllMessages.length > 0 && cur2.topic) {
+          saveConversation({
+            id: convIdRef.current || cur2.conversationId,
+            topic: cur2.topic || topic,
+            allMessages: newAllMessages,
+            history: newFullHistory,
+          }).then(saved => {
+            if (saved.id && !convIdRef.current) {
+              convIdRef.current = saved.id;
+              dispatch({ type: 'SET_CONV_ID', id: saved.id });
+            }
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || '连接失败' });

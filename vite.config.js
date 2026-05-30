@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const APP_VERSION = '2.4';
+const APP_VERSION = '2.5';
 
 export default defineConfig({
   base: '/roundtable/',
