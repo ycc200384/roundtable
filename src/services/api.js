@@ -7,40 +7,63 @@
 const URL = "https://api.deepseek.com/anthropic/v1/messages";
 const MODEL = "deepseek-v4-pro[1m]";
 
-// ↓ 保留 ljg-roundtable 完整逻辑框架 + 聊天格式输出
-const SYSTEM_PROMPT = `你是李继刚"圆桌讨论"框架的执行引擎。输出格式：微信聊天。禁止markdown。禁止**加粗**。禁止###标题。禁止-列表。禁止---分隔线。
+// ↓ 以下内容直接来自 ljg-roundtable SKILL.md（原版，未修改框架逻辑）
+const SYSTEM_PROMPT = `为了执行本项技能，请严格按照以下步骤操作：
 
-## 执行流程
+1. **解析议题**
+   从用户输入中提取核心议题。如果用户只说"圆桌讨论"未给议题，询问议题。
 
-1. 选3-5位真实历史/当代人物。立场张力网络。至少一位意外视角。绝不虚构人物名。
+2. **选人：提议代表人物**
+   根据议题，选择 3-5 位**真实历史/当代人物**作为代表，覆盖尽可能多的立场维度。每位人物需要：
+   - 姓名（真实人物，非虚构）
+   - MBTI 人格类型
+   - 核心立场（一句话）
+   - 选择理由（为什么此人对此议题有独特视角）
 
-2. 主持人开场：用聊天语言介绍议题和人物（每人只用一句说清身份和立场）。然后提出定义性问题让各位回答。
+   选人原则：
+   - 立场必须形成**张力网络**（非简单正反方）
+   - 优先选择在该领域有**经典著作或知名言论**的人物
+   - 至少包含一位"意外视角"——来自议题本身领域之外的人
 
-3. 辩论循环：
-   - 人物根据动态发言，必须回应前人的话（质疑/补充/反驳）。不许自说自话。
-   - 主持人综述：提炼核心争议，提出下一层引导问题。
-   - 指令提示：(可 / 止 / 深入此节 / 引入新人物)
+3. **开场：统一定义**
+   以主持人身份开场，展示参会人物列表，然后提出**定义性问题**
 
-4. 收到止后：全局总结，知识网络，开放问题。
+   每位参会者依次发言，格式为：
+   【人物名】【行动标签】：发言内容
 
-5. 主持人理性客观，挖深不铺广。参会者忠于真实思想体系，引用经典观点。每段结尾必加"简言之：一句话"。
+   **简言之**：一句话总结
 
-## 输出格式（绝对铁律）
+   行动标签包括：陈述、质疑、补充、反驳、修正、综合
 
-每一段发言单独一行。格式：名字：内容
+4. **对话循环**
+   每轮执行以下流程：
 
-主持人介绍人物时这样写：
-主持人：今天讨论「如何致富」。我邀请了四位。亚当斯密，现代经济学之父，主张财富源于自由市场。马克思，资本论的作者，批判资本积累的本质。塔勒布，黑天鹅的作者，认为财富是对风险的洞察。释迦牟尼，从解脱视角看待执念。我先提一个问题：如何定义致富？
+   4a. 动态发言轮
+   - 不是每人固定说一次——根据讨论动态决定谁该发言
+   - 每人发言必须是对前面发言的回应（质疑/补充/反驳），不许自说自话
+   - 每段发言末尾必须有 **简言之**：一句话压缩
 
-亚当斯密：致富是通过劳动分工提升生产力，在市场交换中为他人创造价值。不是简单聚敛金银，而是让整个社会的生产力得到解放。简言之：致富的本质是为社会创造更多价值。
+   4b. 主持人综述
+   发言结束后，主持人提炼本轮核心争议点，生成ASCII思考框架图，提出下一层引导问题
 
-马克思：斯密先生描绘的图景很美好，但他忽略了资本与劳动之间的权力关系。你所谓的为他人创造价值，在工资劳动制下本质上是剩余价值的占有。简言之：致富在资本主义下是资本对劳动的剥削。
+   4c. 用户指令
+   综述后展示指令菜单：
+   【主持】：(指令: 可 / 止 / 深入此节 / 引入新人物)
 
-主持人：本轮核心争议在于：致富是价值创造还是价值转移？斯密说创造，马克思说转移。这个裂缝值得我们深挖。(可 / 止 / 深入此节 / 引入新人物)
+5. **结束：生成知识网络**
+   用户发出 止 指令后：全局总结 + 知识网络ASCII图 + 开放问题
 
-禁止使用：**、*、###、---、- 列表、> 引用、[]()链接、代码块。
-禁止说"好的，让我们开始"之类开场白。直接开始圆桌。
-用你自然的语言写出每个人的发言，不要复制粘贴上面的例子。`;
+### 主持人行为准则
+- 理性之锚：冷静客观，不偏向任何一方
+- 挖深不铺广：每轮只追一条最深的裂缝
+- 求真 > 和谐：鼓励尖锐但有建设性的交锋
+- 元认知：在综述中暴露讨论的结构
+
+### 参会者行为准则
+- 必须忠于其真实思想体系发言
+- 引用/化用其经典著作或知名观点
+- 发言有锋芒：质疑要见骨，补充要推进
+- 每段结尾 **简言之** 一句话压到极致`;
 
 // ===== API 调用（不动 skill 内容）=====
 
@@ -137,115 +160,64 @@ export async function* streamChat(messages) {
  * 输入格式：【人物名】【行动标签】：内容
  * 输出格式：{ type:"speech", name:"孔子", content:"发言内容（去标签）" }
  */
-export function progressiveParse(fullText) {
-  const rawMessages = [];
-  const lines = fullText.split("\n");
-  let current = null;
-  const knownNames = new Set();
+// ===== 前端解析：把 skill 原版输出转为聊天消息 =====
+// 原版格式：【人物名】【行动标签】：发言内容\n**简言之**：一句话
+// 不修改 skill 内容，只做格式转换
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+export function progressiveParse(fullText) {
+  const messages = [];
+  const lines = fullText.split('\n');
+  let current = null;
+
+  for (const line of lines) {
     let t = line.trim();
     if (!t) continue;
-    if (/^[-*_]{3,}$/.test(t)) continue; // --- dividers skip
 
-    // Strip markdown from the line first for matching
-    const plain = stripMarkdown(t);
+    // Skip markdown dividers and headings
+    if (/^[-*_]{3,}$/.test(t) || /^#{1,6}\s/.test(t)) continue;
 
-    // Match speaker patterns in cleaned text (plain)
-    const modMatch = plain.match(/^(?:主持人|【主持】)[：:]\s*(.+)/);
-    // 【Name】【Action】：format (after stripMarkdown removes bullet prefix)
-    const bracketMatch = plain.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
-    // Known figure：content
-    let figMatch = null;
-    for (const name of knownNames) {
-      const idx = plain.indexOf(name + '：');
-      if (idx === 0 || (idx > 0 && /^[-*·•\s]+$/.test(plain.slice(0, idx)))) {
-        figMatch = { name, content: plain.slice(idx + name.length + 1).trim() };
-        break;
-      }
-    }
-    // New figure pattern
-    const EXCLUDED = new Set(['主持人', '简言之', '总结', '指令', '问题', '回答', '讨论', '议题', '好的', '我们']);
-    if (!modMatch && !bracketMatch && !figMatch) {
-      const newFig = plain.match(/^(.{1,12})[：:]\s*(.+)/);
-      if (newFig && !EXCLUDED.has(newFig[1]) && !knownNames.has(newFig[1])) {
-        const c = newFig[1].trim();
-        if (c.length >= 2 && c.length <= 10) { knownNames.add(c); figMatch = { name: c, content: newFig[2].trim() }; }
-      }
-    }
+    // Strip leading bullet/list markers for matching
+    const clean = t.replace(/^[-*+·•]\s*/, '').trim();
 
-    if (bracketMatch && !figMatch) {
-      const bname = bracketMatch[1].trim();
-      knownNames.add(bname);
-      figMatch = { name: bname, content: bracketMatch[3] };
-    }
+    // Match 主持人：content (with or without 【】brackets)
+    const modM = clean.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
+    // Match 【Name】【Action】：content
+    const figM = clean.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
+    // Also match plain "Name：content" if we've seen this name before in bracket format
+    // This handles cases where the AI switches between 【】 and plain format
 
-    if (modMatch) {
-      if (current?.content?.trim()) rawMessages.push({ ...current });
-      current = { type: "speech", name: "主持人", content: modMatch[1] || '' };
-    } else if (bracketMatch || figMatch) {
-      if (current?.content?.trim()) rawMessages.push({ ...current });
-      const f = bracketMatch || figMatch;
-      current = { type: "speech", name: f.name || '未知', content: f.content || '' };
+    if (modM) {
+      if (current?.content?.trim()) messages.push({ ...current });
+      current = { type: 'speech', name: '主持人', content: cleanText(modM[1]) };
+    } else if (figM) {
+      if (current?.content?.trim()) messages.push({ ...current });
+      current = { type: 'speech', name: figM[1].trim(), content: cleanText(figM[3]) };
     } else if (current) {
-      current.content += "\n" + plain;
-    } else if (plain && !plain.startsWith('#') && plain.length > 3) {
-      current = { type: "speech", name: "主持人", content: plain };
+      // Continue previous message (multi-line content, 简言之, ASCII diagram, etc.)
+      current.content += '\n' + cleanText(t);
+    } else {
+      // Text before any recognized speaker → moderator
+      current = { type: 'speech', name: '主持人', content: cleanText(t) };
     }
   }
 
-  if (current?.content?.trim()) rawMessages.push({ ...current });
-  if (rawMessages.length === 0 && fullText.trim()) {
-    rawMessages.push({ type: "speech", name: "主持人", content: stripMarkdown(fullText.trim()) });
+  if (current?.content?.trim()) {
+    messages.push({ ...current });
   }
 
-  // Split long messages into smaller bubbles + final cleanup
-  const messages = [];
-  for (const msg of rawMessages) {
-    const parts = splitLongMessage(msg);
-    messages.push(...parts);
+  if (messages.length === 0 && fullText.trim()) {
+    messages.push({ type: 'speech', name: '主持人', content: cleanText(fullText.trim()) });
   }
+
   return { messages, streamingMsg: null };
 }
 
-// Strip ALL markdown: bold, italic, bullets, headings, links, (MBTI) tags
-function stripMarkdown(text) {
+// Clean markdown formatting from text: remove **bold**, ###headings, - bullets
+function cleanText(text) {
+  if (!text) return '';
   return text
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/\*(.+?)\*/g, '$1')
-    .replace(/^#{1,6}\s*/gm, '')
-    .replace(/^[-*+]\s+/gm, '')
-    .replace(/^>\s*/gm, '')
-    .replace(/`(.+?)`/g, '$1')
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-    .replace(/\([A-Z]{4}\)/g, '')  // (INTP) (MBTI) tags
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-}
-
-// Split messages at sentence boundaries for natural chat feel.
-// Moderator messages get split more aggressively (1-2 sentences per bubble).
-// Figure messages only split if very long.
-function splitLongMessage(msg) {
-  const text = msg.content;
-  const sentences = text.split(/(?<=[。！？])\s*/).filter(s => s.trim());
-  if (sentences.length <= 1) return [msg];
-
-  const isMod = msg.name === '主持人';
-  const groupSize = isMod ? 2 : 4; // moderator: 2 sentences/bubble, figures: 4
-
-  const parts = [];
-  let buf = '';
-  for (const s of sentences) {
-    const combined = buf ? buf + s : s;
-    if (buf && combined.length > (isMod ? 120 : 300)) {
-      parts.push({ ...msg, content: buf.trim() });
-      buf = s;
-    } else {
-      buf = combined;
-    }
-  }
-  if (buf.trim()) parts.push({ ...msg, content: buf.trim() });
-  return parts.length > 0 ? parts : [msg];
 }
