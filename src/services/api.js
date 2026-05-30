@@ -187,8 +187,11 @@ export function progressiveParse(fullText) {
     // Strip bullet/list markers + bold markers from line start
     let clean = t.replace(/^[-*+·•]\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '').trim();
 
-    // Skip section headers like "4b. 主持人综述", "### 开场", etc.
+    // Skip section headers
     if (/^\d+[a-z]?\.\s/.test(clean) || /^#{1,6}\s/.test(clean) || /^[a-z]\d?[.、]\s/i.test(clean)) continue;
+
+    // Force moderator message for summary/transition phrases
+    const isModeratorLine = /^(本轮核心争议|下一层引导|目前讨论格局|第一轮发言完毕|第[一二三四五]轮发言完毕|主持人综述|核心争议点在于|下一轮问题|.*的解剖图|.*思考框架|.*张力场)/.test(clean);
 
     // === SPEAKER DETECTION ===
     // Pattern 1: 【主持】： or 主持人： or **主持人**： (with or without bold)
@@ -210,9 +213,14 @@ export function progressiveParse(fullText) {
       }
     }
 
-    if (modMatch) {
+    // Skip ASCII diagram lines (纯框线/符号组成的行)
+    const isAsciiArt = /^[╔╚╠╦╩═║─│┌┐└┘├┤┬┴┼\s\[\]+\/\\|()《》\^]+$/.test(t) && t.length > 10;
+    if (isAsciiArt) continue;
+
+    if (modMatch || isModeratorLine) {
       if (current?.content?.trim()) messages.push(current);
-      current = { type: 'speech', name: '主持人', content: cleanText(modMatch[1]) };
+      const txt = modMatch ? modMatch[1] : clean;
+      current = { type: 'speech', name: '主持人', content: cleanText(txt) };
     } else if (bracketMatch) {
       if (current?.content?.trim()) messages.push(current);
       const name = bracketMatch[1].trim();
