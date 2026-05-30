@@ -178,11 +178,14 @@ export function progressiveParse(fullText) {
     if (/^[-*_]{3,}$/.test(t)) continue;
     if (/^#{1,6}\s/.test(t)) continue;
 
-    // Strip bullet/list markers
-    const clean = t.replace(/^[-*+·•]\s*/, '').trim();
+    // Strip bullet/list markers + bold markers from line start
+    let clean = t.replace(/^[-*+·•]\s*/, '').replace(/^\*\*/, '').replace(/\*\*$/, '').trim();
+
+    // Skip section headers like "4b. 主持人综述", "### 开场", etc.
+    if (/^\d+[a-z]?\.\s/.test(clean) || /^#{1,6}\s/.test(clean) || /^[a-z]\d?[.、]\s/i.test(clean)) continue;
 
     // === SPEAKER DETECTION ===
-    // Pattern 1: 【主持】： or 主持人： (with or without **bold**)
+    // Pattern 1: 【主持】： or 主持人： or **主持人**： (with or without bold)
     const modMatch = clean.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
 
     // Pattern 2: 【Name】【Action】： (original skill format)
