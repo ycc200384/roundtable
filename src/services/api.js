@@ -142,22 +142,20 @@ export async function* streamChat(messages) {
  * 输出格式：{ type:"speech", name:"孔子", content:"发言内容（去标签）" }
  */
 export function progressiveParse(fullText) {
-  const messages = [];
+  const rawMessages = [];
   const lines = fullText.split("\n");
   let current = null;
-
-  // Known figure names collected so we can recognize "Name：" patterns
   const knownNames = new Set();
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const t = line.trim();
 
-    // Match 【主持】：content  or  主持人：content
+    if (!t) continue; // skip empty lines
+    if (/^[-*_]{3,}$/.test(t)) continue; // skip markdown dividers --- *** ___
+
     const modMatch = t.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
-    // Match 【Name】【Action】：content
     const figMatch = t.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
-    // Match known figure name followed by ：（plain format, no brackets）
     let plainMatch = null;
     for (const name of knownNames) {
       if (t.startsWith(name + '：') || t.startsWith(name + ':')) {
@@ -167,32 +165,76 @@ export function progressiveParse(fullText) {
     }
 
     if (modMatch) {
-      if (current?.content.trim()) messages.push({ ...current });
-      current = { type: "speech", name: "主持人", content: modMatch[1] };
+      if (current?.content.trim()) rawMessages.push({ ...current });
+      current = { type: "speech", name: "主持人", content: cleanContent(modMatch[1]) };
     } else if (figMatch) {
-      if (current?.content.trim()) messages.push({ ...current });
+      if (current?.content.trim()) rawMessages.push({ ...current });
       const name = figMatch[1].trim();
       knownNames.add(name);
-      current = { type: "speech", name, content: figMatch[3] };
+      current = { type: "speech", name, content: cleanContent(figMatch[3]) };
     } else if (plainMatch) {
-      if (current?.content.trim()) messages.push({ ...current });
-      current = { type: "speech", name: plainMatch.name, content: plainMatch.content };
+      if (current?.content.trim()) rawMessages.push({ ...current });
+      current = { type: "speech", name: plainMatch.name, content: cleanContent(plainMatch.content) };
     } else if (current) {
-      // Continue previous message
-      current.content += "\n" + line;
-    } else if (t) {
-      // Stray text with no speaker yet → start as moderator
-      current = { type: "speech", name: "主持人", content: t };
+      current.content += "\n" + cleanContent(t);
+    } else if (t && !t.startsWith('#')) {
+      current = { type: "speech", name: "主持人", content: cleanContent(t) };
     }
   }
 
   if (current?.content.trim()) {
-    messages.push({ ...current });
+    rawMessages.push({ ...current });
   }
 
-  if (messages.length === 0 && fullText.trim()) {
-    messages.push({ type: "speech", name: "主持人", content: fullText.trim() });
+  if (rawMessages.length === 0 && fullText.trim()) {
+    rawMessages.push({ type: "speech", name: "主持人", content: cleanContent(fullText.trim()) });
+  }
+
+  // Split long messages (especially moderator) into smaller bubbles
+  const messages = [];
+  for (const msg of rawMessages) {
+    const parts = splitLongMessage(msg);
+    messages.push(...parts);
   }
 
   return { messages, streamingMsg: null };
+}
+
+// Strip markdown symbols but keep readable text
+function cleanContent(text) {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, '$1')   // **bold** → bold
+    .replace(/\*(.+?)\*/g, '$1')       // *italic* → italic
+    .replace(/^#{1,6}\s*/gm, '')       // ### heading → text
+    .replace(/^[-*+]\s+/gm, '')        // - bullet → text
+    .replace(/^>\s*/gm, '')            // > blockquote
+    .replace(/`(.+?)`/g, '$1')         // `code`
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // [link](url)
+    .replace(/\n{3,}/g, '\n\n')        // collapse 3+ newlines
+    .trim();
+}
+
+// Split long messages at sentence boundaries
+function splitLongMessage(msg) {
+  const MAX_LEN = 200;
+  const text = msg.content;
+  if (text.length <= MAX_LEN) return [msg];
+
+  const parts = [];
+  // Split by sentence endings: 。！？\n
+  const sentences = text.split(/(?<=[。！？])\s*/);
+  let currentPart = '';
+
+  for (const s of sentences) {
+    if (currentPart && currentPart.length + s.length > MAX_LEN) {
+      parts.push({ ...msg, content: currentPart.trim() });
+      currentPart = s;
+    } else {
+      currentPart += (currentPart ? s : s);
+    }
+  }
+  if (currentPart.trim()) {
+    parts.push({ ...msg, content: currentPart.trim() });
+  }
+  return parts.length > 0 ? parts : [msg];
 }
