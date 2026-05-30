@@ -14,7 +14,6 @@ const initState = {
   history: [],
   isStreaming: false,
   darkMode: false,
-  streamingMsg: null,
   error: null,
   loaded: false,
 };
@@ -33,24 +32,15 @@ function reducer(state, action) {
     case 'ADD_USER_MSG':
       return { ...state, allMessages: [...state.allMessages, { type: 'user', content: action.content }] };
     case 'START_STREAM':
-      return { ...state, isStreaming: true, error: null, streamingMsg: null };
-    case 'UPDATE_STREAM': {
-      const { messages } = progressiveParse(action.fullText);
-      return { ...state, streamingMsg: null, aiMessages: messages };
-    }
-    case 'FINISH_STREAM': {
-      const parsed = action.parsed || [];
-      const newHistory = [...state.history];
-      if (action.content?.trim()) newHistory.push({ role: 'assistant', content: action.content.trim() });
-      return { ...state, allMessages: [...state.allMessages, ...parsed],
-        history: newHistory, isStreaming: false, streamingMsg: null, aiMessages: [] };
-    }
+      return { ...state, isStreaming: true, error: null };
+    case 'FINISH_BATCH':
+      return { ...state, allMessages: action.messages, history: action.history, isStreaming: false };
     case 'SET_ERROR':
-      return { ...state, isStreaming: false, error: action.error, streamingMsg: null };
+      return { ...state, isStreaming: false, error: action.error };
     case 'TOGGLE_DARK':
       return { ...state, darkMode: !state.darkMode };
     case 'NEW_SESSION':
-      return { ...state, conversationId: null, topic: '', allMessages: [], history: [], error: null, streamingMsg: null, aiMessages: [] };
+      return { ...state, conversationId: null, topic: '', allMessages: [], history: [], error: null };
     default: return state;
   }
 }
@@ -136,7 +126,7 @@ export default function App() {
     if (nearBottom) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [state.allMessages, state.streamingMsg]);
+  }, [state.allMessages]);
 
   function handleChatScroll(e) {
     const el = e.target;
@@ -171,20 +161,29 @@ export default function App() {
     const newHistory = [...cur.history, { role: 'user', content: userText }];
 
     dispatch({ type: 'START_STREAM' });
-    streamTextRef.current = '';
+    let fullText = '';
 
     try {
       for await (const chunk of streamChat(newHistory)) {
         if (chunk.text) {
-          streamTextRef.current += chunk.text;
-          dispatch({ type: 'UPDATE_STREAM', fullText: streamTextRef.current });
+          fullText += chunk.text;
         }
       }
-      if (!streamTextRef.current) {
+      if (!fullText.trim()) {
         dispatch({ type: 'SET_ERROR', error: 'AI 未返回内容，请重试' });
       } else {
-        const final = progressiveParse(streamTextRef.current);
-        dispatch({ type: 'FINISH_STREAM', parsed: final.messages, content: streamTextRef.current });
+        // Parse ALL at once after stream completes
+        const parsed = progressiveParse(fullText);
+        const newAllMessages = [...stateRef.current.allMessages, ...parsed.messages];
+        const newFullHistory = [...newHistory];
+        if (fullText.trim()) newFullHistory.push({ role: 'assistant', content: fullText.trim() });
+
+        // Dispatch all at once to avoid race conditions
+        dispatch({
+          type: 'FINISH_BATCH',
+          messages: newAllMessages,
+          history: newFullHistory,
+        });
       }
     } catch (err) {
       dispatch({ type: 'SET_ERROR', error: err.message || '连接失败' });
@@ -253,20 +252,14 @@ export default function App() {
           </div>
         )}
 
-        {/* All completed messages */}
+        {/* All messages */}
         {state.allMessages.map((msg, i) => (
-          <ChatBubble key={`s-${i}`} message={msg} darkMode={state.darkMode}
-            style={{ animationDelay: `${Math.min(i * 0.03, 0.2)}s` }} />
+          <ChatBubble key={`m-${i}`} message={msg} darkMode={state.darkMode}
+            style={{ animationDelay: `${Math.min(i * 0.02, 0.15)}s` }} />
         ))}
 
-        {/* AI messages streaming in */}
-        {(state.aiMessages || []).map((msg, i) => (
-          <ChatBubble key={`ai-${i}`} message={msg} darkMode={state.darkMode}
-            style={{ animationDelay: '0s' }} />
-        ))}
-
-        {/* Loading indicator when nothing yet */}
-        {state.isStreaming && (!state.aiMessages || state.aiMessages.length === 0) && <LoadingDots />}
+        {/* Loading during streaming */}
+        {state.isStreaming && <LoadingDots />}
 
         {/* Scroll-to-bottom button */}
         {!nearBottom && (
