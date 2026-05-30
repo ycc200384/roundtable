@@ -197,12 +197,13 @@ export function progressiveParse(fullText) {
     // Pattern 1: 【主持】： or 主持人： or **主持人**： (with or without bold)
     const modMatch = clean.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
 
-    // Pattern 2: 【Name】【Action】： (original skill format)
+    // Pattern 2: 【Name】【Action】： OR Name【Action】： (both formats)
     const bracketMatch = clean.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
+    const altBracket = !bracketMatch ? clean.match(/^(.{1,16}?)【(.+?)】[：:]\s*(.*)/) : null;
 
     // Pattern 3: ONLY match known figure names (seen in 【】 format before)
     let nameMatch = null;
-    if (!modMatch && !bracketMatch) {
+    if (!modMatch && !bracketMatch && !altBracket) {
       const m = clean.match(/^(?:\*\*)?(.{2,16}?)(?:\*\*)?[：:]\s*(.+)/);
       if (m) {
         const candidate = m[1].trim();
@@ -221,11 +222,12 @@ export function progressiveParse(fullText) {
       if (current?.content?.trim()) messages.push(current);
       const txt = modMatch ? modMatch[1] : clean;
       current = { type: 'speech', name: '主持人', content: cleanText(txt) };
-    } else if (bracketMatch) {
+    } else if (bracketMatch || altBracket) {
       if (current?.content?.trim()) messages.push(current);
-      const name = bracketMatch[1].trim();
+      const m = bracketMatch || altBracket;
+      const name = m[1].trim();
       seenNames.add(name);
-      current = { type: 'speech', name, content: cleanText(bracketMatch[3]) };
+      current = { type: 'speech', name, content: cleanText(m[3] || '') };
     } else if (nameMatch) {
       if (current?.content?.trim()) messages.push(current);
       current = { type: 'speech', name: nameMatch.name, content: cleanText(nameMatch.content) };
