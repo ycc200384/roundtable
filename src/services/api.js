@@ -219,27 +219,28 @@ function stripMarkdown(text) {
     .trim();
 }
 
-// Split long messages at sentence boundaries
+// Split messages at sentence boundaries for natural chat feel.
+// Moderator messages get split more aggressively (1-2 sentences per bubble).
+// Figure messages only split if very long.
 function splitLongMessage(msg) {
-  const MAX_LEN = 200;
   const text = msg.content;
-  if (text.length <= MAX_LEN) return [msg];
+  const sentences = text.split(/(?<=[。！？])\s*/).filter(s => s.trim());
+  if (sentences.length <= 1) return [msg];
+
+  const isMod = msg.name === '主持人';
+  const groupSize = isMod ? 2 : 4; // moderator: 2 sentences/bubble, figures: 4
 
   const parts = [];
-  // Split by sentence endings: 。！？\n
-  const sentences = text.split(/(?<=[。！？])\s*/);
-  let currentPart = '';
-
+  let buf = '';
   for (const s of sentences) {
-    if (currentPart && currentPart.length + s.length > MAX_LEN) {
-      parts.push({ ...msg, content: currentPart.trim() });
-      currentPart = s;
+    const combined = buf ? buf + s : s;
+    if (buf && combined.length > (isMod ? 120 : 300)) {
+      parts.push({ ...msg, content: buf.trim() });
+      buf = s;
     } else {
-      currentPart += (currentPart ? s : s);
+      buf = combined;
     }
   }
-  if (currentPart.trim()) {
-    parts.push({ ...msg, content: currentPart.trim() });
-  }
+  if (buf.trim()) parts.push({ ...msg, content: buf.trim() });
   return parts.length > 0 ? parts : [msg];
 }
