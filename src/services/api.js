@@ -167,10 +167,12 @@ export function progressiveParse(fullText) {
     // But NOT主持人
     if (!modMatch && !figMatch) {
       const newFig = plain.match(/^(.{1,12})[：:]\s*(.+)/);
-      if (newFig && newFig[1] !== '主持人' && !knownNames.has(newFig[1])) {
+      const EXCLUDED = new Set(['主持人', '简言之', '总结', '指令', '问题', '回答', '讨论', '议题']);
+      if (newFig && !EXCLUDED.has(newFig[1]) && !knownNames.has(newFig[1])) {
         const candidate = newFig[1].trim();
         // Only treat as new figure if it looks like a person name (Chinese/English, 2-6 chars)
-        if (candidate.length >= 2 && candidate.length <= 8) {
+        // Must NOT look like a phrase/keyword
+        if (candidate.length >= 2 && candidate.length <= 8 && !/^[简总指问回答讨论议题]$/.test(candidate)) {
           knownNames.add(candidate);
           figMatch = { name: candidate, content: newFig[2].trim() };
         }
