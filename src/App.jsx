@@ -67,8 +67,20 @@ export default function App() {
   const [nearBottom, setNearBottom] = useState(true);
 
   const [showSettings, setShowSettings] = useState(false);
-  const [keyInput, setKeyInput] = useState(getStoredApiKey());
-  const [hasApiKey, setHasApiKey] = useState(!!getStoredApiKey());
+  const [keyInput, setKeyInput] = useState(() => getStoredApiKey());
+  const [hasApiKey, setHasApiKey] = useState(() => !!getStoredApiKey());
+
+  // Refresh API key state when page gets focus (handles cases where user edits localStorage)
+  useEffect(() => {
+    function onFocus() {
+      const stored = getStoredApiKey();
+      setKeyInput(stored);
+      setHasApiKey(!!stored);
+    }
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onFocus(); });
+    return () => { window.removeEventListener('focus', onFocus); };
+  }, []);
   const [showHistory, setShowHistory] = useState(false);
 
   function handleSaveKey() {
