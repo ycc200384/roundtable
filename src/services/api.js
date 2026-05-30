@@ -8,43 +8,39 @@ const URL = "https://api.deepseek.com/anthropic/v1/messages";
 const MODEL = "deepseek-v4-pro[1m]";
 
 // ↓ 保留 ljg-roundtable 完整逻辑框架 + 聊天格式输出
-const SYSTEM_PROMPT = `你是李继刚"圆桌讨论"的执行者。严格遵循以下框架，输出微信聊天格式。
+const SYSTEM_PROMPT = `你是李继刚"圆桌讨论"框架的执行引擎。输出格式：微信聊天。禁止markdown。禁止**加粗**。禁止###标题。禁止-列表。禁止---分隔线。
 
-## 执行流程（核心逻辑不可改）
+## 执行流程
 
-1. 解析议题，选3-5位真实历史/当代人物。立场形成张力网络，至少一位意外视角。绝不用虚构人物。
+1. 选3-5位真实历史/当代人物。立场张力网络。至少一位意外视角。绝不虚构人物名。
 
-2. 主持人开场：介绍议题和人物（每人一句身份+立场），提出定义性问题。
+2. 主持人开场：用聊天语言介绍议题和人物（每人只用一句说清身份和立场）。然后提出定义性问题让各位回答。
 
 3. 辩论循环：
-   - 动态发言：根据讨论动态决定谁发言，必须回应前面的人（质疑/补充/反驳）
-   - 主持人综述：提炼核心争议 → 提出下一层引导问题
+   - 人物根据动态发言，必须回应前人的话（质疑/补充/反驳）。不许自说自话。
+   - 主持人综述：提炼核心争议，提出下一层引导问题。
    - 指令提示：(可 / 止 / 深入此节 / 引入新人物)
 
-4. 收到"止"后：全局总结 + 知识网络 + 开放问题
+4. 收到止后：全局总结，知识网络，开放问题。
 
-5. 主持人理性客观，挖深不铺广。参会者忠于真实思想体系发言，引用经典著作观点。每段结尾简言之总结。
+5. 主持人理性客观，挖深不铺广。参会者忠于真实思想体系，引用经典观点。每段结尾必加"简言之：一句话"。
 
-## 输出格式（绝对遵守）
+## 输出格式（绝对铁律）
 
-每段发言独立一行，格式：说话人名字：内容
+每一段发言单独一行。格式：名字：内容
 
-示例：
-主持人：本次议题是「如何致富」。我邀请了四位：亚当·斯密，现代经济学之父，主张财富源于自由市场。马克思，深刻批判资本积累的本质。塔勒布，认为财富是对风险的驾驭。释迦牟尼，他从解脱视角看待执念。请问各位如何定义"致富"？
+主持人介绍人物时这样写：
+主持人：今天讨论「如何致富」。我邀请了四位。亚当斯密，现代经济学之父，主张财富源于自由市场。马克思，资本论的作者，批判资本积累的本质。塔勒布，黑天鹅的作者，认为财富是对风险的洞察。释迦牟尼，从解脱视角看待执念。我先提一个问题：如何定义致富？
 
-亚当·斯密：致富并非简单的聚敛金银。它本质上是通过劳动分工提升生产力，在市场交换中为他人创造价值的过程...
+亚当斯密：致富是通过劳动分工提升生产力，在市场交换中为他人创造价值。不是简单聚敛金银，而是让整个社会的生产力得到解放。简言之：致富的本质是为社会创造更多价值。
 
-马克思：斯密先生描绘的图景令人向往，但他忽略了资本与劳动之间的权力关系。你所谓的"为他人创造价值"，在工资劳动制下，实质上是对剩余价值的占有...
+马克思：斯密先生描绘的图景很美好，但他忽略了资本与劳动之间的权力关系。你所谓的为他人创造价值，在工资劳动制下本质上是剩余价值的占有。简言之：致富在资本主义下是资本对劳动的剥削。
 
-简言之：致富在资本主义框架下本质是资本的自我增殖，而非个体间的公平交换。
+主持人：本轮核心争议在于：致富是价值创造还是价值转移？斯密说创造，马克思说转移。这个裂缝值得我们深挖。(可 / 止 / 深入此节 / 引入新人物)
 
-主持人：本轮的核心争议在于：致富究竟是价值创造还是价值转移？(可 / 止 / 深入此节 / 引入新人物)
-
-## 格式铁律
-- 必须用"名字：内容"格式，不许用markdown标题(###)、加粗(**)、列表(- *)
-- 不许出现"好的，我们开始"之类的开场白，直接进入圆桌
-- 人物名字必须准确（如"亚当·斯密"不是"亚当斯密"）
-- 简言之放在发言末尾，格式：简言之：一句话`;
+禁止使用：**、*、###、---、- 列表、> 引用、[]()链接、代码块。
+禁止说"好的，让我们开始"之类开场白。直接开始圆桌。
+用你自然的语言写出每个人的发言，不要复制粘贴上面的例子。`;
 
 // ===== API 调用（不动 skill 内容）=====
 
@@ -149,68 +145,77 @@ export function progressiveParse(fullText) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const t = line.trim();
+    let t = line.trim();
+    if (!t) continue;
+    if (/^[-*_]{3,}$/.test(t)) continue; // --- dividers skip
 
-    if (!t) continue; // skip empty lines
-    if (/^[-*_]{3,}$/.test(t)) continue; // skip markdown dividers --- *** ___
+    // Strip markdown from the line first for matching
+    const plain = stripMarkdown(t);
 
-    const modMatch = t.match(/^(?:【主持】|主持人)[：:]\s*(.*)/);
-    const figMatch = t.match(/^【(.+?)】【(.+?)】[：:]\s*(.*)/);
-    let plainMatch = null;
+    // Match speaker：content patterns in the cleaned text
+    // 主持人： / **主持人**： / 【主持】：
+    const modMatch = plain.match(/^(?:主持人|【主持】)[：:]\s*(.+)/);
+    // Known figure name：content
+    let figMatch = null;
     for (const name of knownNames) {
-      if (t.startsWith(name + '：') || t.startsWith(name + ':')) {
-        plainMatch = { name, content: t.slice(name.length + 1).trim() };
+      if (plain.startsWith(name + '：') || plain.startsWith(name + ':')) {
+        figMatch = { name, content: plain.slice(name.length + 1).trim() };
         break;
+      }
+    }
+    // New figure: "Name（MBTI）：content" or "Name：content" or "**Name**：content"
+    // But NOT主持人
+    if (!modMatch && !figMatch) {
+      const newFig = plain.match(/^(.{1,12})[：:]\s*(.+)/);
+      if (newFig && newFig[1] !== '主持人' && !knownNames.has(newFig[1])) {
+        const candidate = newFig[1].trim();
+        // Only treat as new figure if it looks like a person name (Chinese/English, 2-6 chars)
+        if (candidate.length >= 2 && candidate.length <= 8) {
+          knownNames.add(candidate);
+          figMatch = { name: candidate, content: newFig[2].trim() };
+        }
       }
     }
 
     if (modMatch) {
       if (current?.content.trim()) rawMessages.push({ ...current });
-      current = { type: "speech", name: "主持人", content: cleanContent(modMatch[1]) };
+      current = { type: "speech", name: "主持人", content: modMatch[1] };
     } else if (figMatch) {
       if (current?.content.trim()) rawMessages.push({ ...current });
-      const name = figMatch[1].trim();
-      knownNames.add(name);
-      current = { type: "speech", name, content: cleanContent(figMatch[3]) };
-    } else if (plainMatch) {
-      if (current?.content.trim()) rawMessages.push({ ...current });
-      current = { type: "speech", name: plainMatch.name, content: cleanContent(plainMatch.content) };
+      current = { type: "speech", name: figMatch.name, content: figMatch.content };
     } else if (current) {
-      current.content += "\n" + cleanContent(t);
-    } else if (t && !t.startsWith('#')) {
-      current = { type: "speech", name: "主持人", content: cleanContent(t) };
+      current.content += "\n" + plain;
+    } else if (plain && !plain.startsWith('#') && plain.length > 3) {
+      current = { type: "speech", name: "主持人", content: plain };
     }
   }
 
-  if (current?.content.trim()) {
-    rawMessages.push({ ...current });
-  }
-
+  if (current?.content.trim()) rawMessages.push({ ...current });
   if (rawMessages.length === 0 && fullText.trim()) {
-    rawMessages.push({ type: "speech", name: "主持人", content: cleanContent(fullText.trim()) });
+    rawMessages.push({ type: "speech", name: "主持人", content: stripMarkdown(fullText.trim()) });
   }
 
-  // Split long messages (especially moderator) into smaller bubbles
+  // Split long messages into smaller bubbles + final cleanup
   const messages = [];
   for (const msg of rawMessages) {
     const parts = splitLongMessage(msg);
     messages.push(...parts);
   }
-
   return { messages, streamingMsg: null };
 }
 
-// Strip markdown symbols but keep readable text
-function cleanContent(text) {
+// Strip ALL markdown: bold, italic, bullets, headings, links, (MBTI) tags
+function stripMarkdown(text) {
   return text
-    .replace(/\*\*(.+?)\*\*/g, '$1')   // **bold** → bold
-    .replace(/\*(.+?)\*/g, '$1')       // *italic* → italic
-    .replace(/^#{1,6}\s*/gm, '')       // ### heading → text
-    .replace(/^[-*+]\s+/gm, '')        // - bullet → text
-    .replace(/^>\s*/gm, '')            // > blockquote
-    .replace(/`(.+?)`/g, '$1')         // `code`
-    .replace(/\[(.+?)\]\(.+?\)/g, '$1') // [link](url)
-    .replace(/\n{3,}/g, '\n\n')        // collapse 3+ newlines
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^>\s*/gm, '')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/\([A-Z]{4}\)/g, '')  // (INTP) (MBTI) tags
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
